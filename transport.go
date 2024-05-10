@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -147,39 +148,12 @@ func (t *Transport) ListenEarly(tlsConf *tls.Config, conf *Config) (*EarlyListen
 }
 
 func (t *Transport) createServer(tlsConf *tls.Config, conf *Config, allow0RTT bool) (*baseServer, error) {
-	if tlsConf == nil {
-		return nil, errors.New("quic: tls.Config not set")
-	}
-	if err := validateConfig(conf); err != nil {
-		return nil, err
-	}
+	//Linea Aggiunta per la stampa alla creazione di un server
 
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
+	fmt.Println("Esecuzione di GiovanniMenon Fork Version ")
 
-	if t.server != nil {
-		return nil, errListenerAlreadySet
-	}
-	conf = populateConfig(conf)
-	if err := t.init(false); err != nil {
-		return nil, err
-	}
-	s := newServer(
-		t.conn,
-		t.handlerMap,
-		t.connIDGenerator,
-		tlsConf,
-		conf,
-		t.Tracer,
-		t.closeServer,
-		*t.TokenGeneratorKey,
-		t.MaxTokenAge,
-		t.VerifySourceAddress,
-		t.DisableVersionNegotiationPackets,
-		allow0RTT,
-	)
-	t.server = s
-	return s, nil
+	return nil, errors.New("quic: Esecuzione di GiovanniMenon Fork Version")
+
 }
 
 // Dial dials a new connection to a remote host (not using 0-RTT).
