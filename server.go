@@ -699,6 +699,11 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 }
 
 func (s *baseServer) handleNewConn(conn quicConn) bool {
+
+	fmt.Println("===================================")
+	fmt.Println("SERVER | Nuova Connessione")
+	fmt.Println("===================================")
+
 	if s.acceptEarlyConns {
 		// wait until the early connection is ready, the handshake fails, or the server is closed
 		select {

@@ -122,6 +122,10 @@ func (m *streamsMap) initMaps() {
 }
 
 func (m *streamsMap) OpenStream() (Stream, error) {
+	fmt.Println("===================================")
+	fmt.Println("APERTURA STREAM")
+	fmt.Println("===================================")
+
 	m.mutex.Lock()
 	reset := m.reset
 	mm := m.outgoingBidiStreams
