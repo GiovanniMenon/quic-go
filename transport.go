@@ -148,12 +148,45 @@ func (t *Transport) ListenEarly(tlsConf *tls.Config, conf *Config) (*EarlyListen
 }
 
 func (t *Transport) createServer(tlsConf *tls.Config, conf *Config, allow0RTT bool) (*baseServer, error) {
+
 	//Linea Aggiunta per la stampa alla creazione di un server
+	fmt.Println("===================================")
+	fmt.Println("Giovanni Menon Fork Version")
+	fmt.Println("===================================")
 
-	fmt.Println("Esecuzione di GiovanniMenon Fork Version ")
+	if tlsConf == nil {
+		return nil, errors.New("quic: tls.Config not set")
+	}
+	if err := validateConfig(conf); err != nil {
+		return nil, err
+	}
 
-	return nil, errors.New("quic: Esecuzione di GiovanniMenon Fork Version")
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
+	if t.server != nil {
+		return nil, errListenerAlreadySet
+	}
+	conf = populateConfig(conf)
+	if err := t.init(false); err != nil {
+		return nil, err
+	}
+	s := newServer(
+		t.conn,
+		t.handlerMap,
+		t.connIDGenerator,
+		tlsConf,
+		conf,
+		t.Tracer,
+		t.closeServer,
+		*t.TokenGeneratorKey,
+		t.MaxTokenAge,
+		t.VerifySourceAddress,
+		t.DisableVersionNegotiationPackets,
+		allow0RTT,
+	)
+	t.server = s
+	return s, nil
 }
 
 // Dial dials a new connection to a remote host (not using 0-RTT).
@@ -320,6 +353,7 @@ func (t *Transport) close(e error) {
 // only print warnings about the UDP receive buffer size once
 var setBufferWarningOnce sync.Once
 
+// Questa funzione ascolta tutti i pacchetti in arrivo, verifica se non ci sono errori ed in tal caso chiama 'handlePacket'
 func (t *Transport) listen(conn rawConn) {
 	defer close(t.listening)
 	defer getMultiplexer().RemoveConn(t.Conn)
@@ -353,13 +387,19 @@ func (t *Transport) listen(conn rawConn) {
 }
 
 func (t *Transport) handlePacket(p receivedPacket) {
+
+	// Se il pacchetto e' vuoto termina
 	if len(p.data) == 0 {
 		return
 	}
+
+	//Se il primo byte indica che non e' un pacchetto QUIC invoca il metodo per gestire i non QUIC-Packet
 	if !wire.IsPotentialQUICPacket(p.data[0]) && !wire.IsLongHeaderPacket(p.data[0]) {
 		t.handleNonQUICPacket(p)
 		return
 	}
+
+	// Estrae il connection id
 	connID, err := wire.ParseConnectionID(p.data, t.connIDLen)
 	if err != nil {
 		t.logger.Debugf("error parsing connection ID on packet from %s: %s", p.remoteAddr, err)
@@ -371,6 +411,7 @@ func (t *Transport) handlePacket(p receivedPacket) {
 	}
 
 	// If there's a connection associated with the connection ID, pass the packet there.
+	// Se c'e' una connection ID associata a quel ID gestiscila
 	if handler, ok := t.handlerMap.Get(connID); ok {
 		handler.handlePacket(p)
 		return
