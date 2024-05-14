@@ -1354,10 +1354,6 @@ func (s *connection) handleFrame(f wire.Frame, encLevel protocol.EncryptionLevel
 // handlePacket is called by the server with a new packet
 func (s *connection) handlePacket(p receivedPacket) {
 
-	fmt.Println("===================================")
-	fmt.Println("PACCHETTO RIVEUTO")
-	fmt.Println("===================================")
-
 	// Discard packets once the amount of queued packets is larger than
 	// the channel size, protocol.MaxConnUnprocessedPackets
 	select {
@@ -1530,15 +1526,8 @@ func (s *connection) handleAckFrame(frame *wire.AckFrame, encLevel protocol.Encr
 		return err
 	}
 	if !acked1RTTPacket {
-		fmt.Println("===================================")
-		fmt.Println("PACCHETTO RIVEUTO ACK NON RTT")
-		fmt.Println("===================================")
 		return nil
 	}
-
-	fmt.Println("===================================")
-	fmt.Println("PACCHETTO RIVEUTO ACK")
-	fmt.Println("===================================")
 
 	// On the client side: If the packet acknowledged a 1-RTT packet, this confirms the handshake.
 	// This is only possible if the ACK was sent in a 1-RTT packet.

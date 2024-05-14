@@ -305,11 +305,13 @@ func (h *sentPacketHandler) getPacketNumberSpace(encLevel protocol.EncryptionLev
 	}
 }
 
+// Sezione da prendere in esame
 func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.EncryptionLevel, rcvTime time.Time) (bool /* contained 1-RTT packet */, error) {
 	pnSpace := h.getPacketNumberSpace(encLevel)
 
 	largestAcked := ack.LargestAcked()
 	if largestAcked > pnSpace.largestSent {
+		fmt.Println("received ACK for an unsent packet")
 		return false, &qerr.TransportError{
 			ErrorCode:    qerr.ProtocolViolation,
 			ErrorMessage: "received ACK for an unsent packet",
@@ -372,6 +374,9 @@ func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.En
 	}
 	// After this point, we must not use ackedPackets any longer!
 	// We've already returned the buffers.
+
+	fmt.Printf("ACK ricevuto: LargestAcked=%d, NumAckedPackets=%d, bytes\n", largestAcked, len(ackedPackets))
+
 	ackedPackets = nil //nolint:ineffassign // This is just to be on the safe side.
 
 	// Reset the pto_count unless the client is unsure if the server has validated the client's address.
@@ -386,8 +391,8 @@ func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.En
 	if h.tracer != nil && h.tracer.UpdatedMetrics != nil {
 		h.tracer.UpdatedMetrics(h.rttStats, h.congestion.GetCongestionWindow(), h.bytesInFlight, h.packetsInFlight())
 	}
-
 	h.setLossDetectionTimer()
+
 	return acked1RTTPacket, nil
 }
 
@@ -603,6 +608,7 @@ func (h *sentPacketHandler) setLossDetectionTimer() {
 	}
 }
 
+// Sezione da prendere in esame
 func (h *sentPacketHandler) detectLostPackets(now time.Time, encLevel protocol.EncryptionLevel) error {
 	pnSpace := h.getPacketNumberSpace(encLevel)
 	pnSpace.lossTime = time.Time{}
