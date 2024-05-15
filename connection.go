@@ -906,13 +906,13 @@ func (s *connection) handleShortHeaderPacket(p receivedPacket, destConnID protoc
 		wire.LogShortHeader(s.logger, destConnID, pn, pnLen, keyPhase)
 	}
 
-	// if s.receivedPacketHandler.IsPotentiallyDuplicate(pn, protocol.Encryption1RTT) {
-	// 	s.logger.Debugf("Dropping (potentially) duplicate packet.")
-	// 	if s.tracer != nil && s.tracer.DroppedPacket != nil {
-	// 		s.tracer.DroppedPacket(logging.PacketType1RTT, pn, p.Size(), logging.PacketDropDuplicate)
-	// 	}
-	// 	return false
-	// }
+	if s.receivedPacketHandler.IsPotentiallyDuplicate(pn, protocol.Encryption1RTT) {
+		s.logger.Debugf("Dropping (potentially) duplicate packet.")
+		if s.tracer != nil && s.tracer.DroppedPacket != nil {
+			s.tracer.DroppedPacket(logging.PacketType1RTT, pn, p.Size(), logging.PacketDropDuplicate)
+		}
+		return false
+	}
 
 	var log func([]logging.Frame)
 	if s.tracer != nil && s.tracer.ReceivedShortHeaderPacket != nil {
@@ -979,13 +979,13 @@ func (s *connection) handleLongHeaderPacket(p receivedPacket, hdr *wire.Header) 
 		packet.hdr.Log(s.logger)
 	}
 
-	// if pn := packet.hdr.PacketNumber; s.receivedPacketHandler.IsPotentiallyDuplicate(pn, packet.encryptionLevel) {
-	// 	s.logger.Debugf("Dropping (potentially) duplicate packet.")
-	// 	if s.tracer != nil && s.tracer.DroppedPacket != nil {
-	// 		s.tracer.DroppedPacket(logging.PacketTypeFromHeader(hdr), pn, p.Size(), logging.PacketDropDuplicate)
-	// 	}
-	// 	return false
-	// }
+	if pn := packet.hdr.PacketNumber; s.receivedPacketHandler.IsPotentiallyDuplicate(pn, packet.encryptionLevel) {
+		s.logger.Debugf("Dropping (potentially) duplicate packet.")
+		if s.tracer != nil && s.tracer.DroppedPacket != nil {
+			s.tracer.DroppedPacket(logging.PacketTypeFromHeader(hdr), pn, p.Size(), logging.PacketDropDuplicate)
+		}
+		return false
+	}
 
 	if err := s.handleUnpackedLongHeaderPacket(packet, p.ecn, p.rcvTime, p.Size()); err != nil {
 		s.closeLocal(err)

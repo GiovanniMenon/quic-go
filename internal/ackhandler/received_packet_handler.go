@@ -102,9 +102,9 @@ func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, o
 		}
 		return nil
 	case protocol.Encryption1RTT:
-		// fmt.Println("Data Ack")
-		// return nil
-		return h.appDataPackets.GetAckFrame(onlyIfQueued)
+		fmt.Println("Data Ack")
+		return nil
+		// return h.appDataPackets.GetAckFrame(onlyIfQueued)
 
 	default:
 		// 0-RTT packets can't contain ACK frames
@@ -114,7 +114,7 @@ func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, o
 
 // Modificata
 func (h *receivedPacketHandler) IsPotentiallyDuplicate(pn protocol.PacketNumber, encLevel protocol.EncryptionLevel) bool {
-	fmt.Println("Forse e' duplicato? Fingiamo che non lo sia")
+	fmt.Println("Controllo Duplicati Ignorato")
 	return false
 	// switch encLevel {
 	// case protocol.EncryptionInitial:
