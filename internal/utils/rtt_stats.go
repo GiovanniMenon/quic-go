@@ -2,8 +2,6 @@ package utils
 
 import (
 	"time"
-
-	"github.com/quic-go/quic-go/internal/protocol"
 )
 
 const (
@@ -51,15 +49,17 @@ func (r *RTTStats) MeanDeviation() time.Duration { return r.meanDeviation }
 func (r *RTTStats) MaxAckDelay() time.Duration { return r.maxAckDelay }
 
 // PTO gets the probe timeout duration.
+// Modificata
 func (r *RTTStats) PTO(includeMaxAckDelay bool) time.Duration {
-	if r.SmoothedRTT() == 0 {
-		return 2 * defaultInitialRTT
-	}
-	pto := r.SmoothedRTT() + max(4*r.MeanDeviation(), protocol.TimerGranularity)
-	if includeMaxAckDelay {
-		pto += r.MaxAckDelay()
-	}
-	return pto
+	// if r.SmoothedRTT() == 0 {
+	// 	return 2 * defaultInitialRTT
+	// }
+	// pto := r.SmoothedRTT() + max(4*r.MeanDeviation(), protocol.TimerGranularity)
+	// if includeMaxAckDelay {
+	// 	pto += r.MaxAckDelay()
+	// }
+	// return pto
+	return 0
 }
 
 // UpdateRTT updates the RTT based on a new sample.
