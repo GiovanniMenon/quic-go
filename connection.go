@@ -906,13 +906,13 @@ func (s *connection) handleShortHeaderPacket(p receivedPacket, destConnID protoc
 		wire.LogShortHeader(s.logger, destConnID, pn, pnLen, keyPhase)
 	}
 
-	if s.receivedPacketHandler.IsPotentiallyDuplicate(pn, protocol.Encryption1RTT) {
-		s.logger.Debugf("Dropping (potentially) duplicate packet.")
-		if s.tracer != nil && s.tracer.DroppedPacket != nil {
-			s.tracer.DroppedPacket(logging.PacketType1RTT, pn, p.Size(), logging.PacketDropDuplicate)
-		}
-		return false
-	}
+	// if s.receivedPacketHandler.IsPotentiallyDuplicate(pn, protocol.Encryption1RTT) {
+	// 	s.logger.Debugf("Dropping (potentially) duplicate packet.")
+	// 	if s.tracer != nil && s.tracer.DroppedPacket != nil {
+	// 		s.tracer.DroppedPacket(logging.PacketType1RTT, pn, p.Size(), logging.PacketDropDuplicate)
+	// 	}
+	// 	return false
+	// }
 
 	var log func([]logging.Frame)
 	if s.tracer != nil && s.tracer.ReceivedShortHeaderPacket != nil {
@@ -979,13 +979,13 @@ func (s *connection) handleLongHeaderPacket(p receivedPacket, hdr *wire.Header) 
 		packet.hdr.Log(s.logger)
 	}
 
-	if pn := packet.hdr.PacketNumber; s.receivedPacketHandler.IsPotentiallyDuplicate(pn, packet.encryptionLevel) {
-		s.logger.Debugf("Dropping (potentially) duplicate packet.")
-		if s.tracer != nil && s.tracer.DroppedPacket != nil {
-			s.tracer.DroppedPacket(logging.PacketTypeFromHeader(hdr), pn, p.Size(), logging.PacketDropDuplicate)
-		}
-		return false
-	}
+	// if pn := packet.hdr.PacketNumber; s.receivedPacketHandler.IsPotentiallyDuplicate(pn, packet.encryptionLevel) {
+	// 	s.logger.Debugf("Dropping (potentially) duplicate packet.")
+	// 	if s.tracer != nil && s.tracer.DroppedPacket != nil {
+	// 		s.tracer.DroppedPacket(logging.PacketTypeFromHeader(hdr), pn, p.Size(), logging.PacketDropDuplicate)
+	// 	}
+	// 	return false
+	// }
 
 	if err := s.handleUnpackedLongHeaderPacket(packet, p.ecn, p.rcvTime, p.Size()); err != nil {
 		s.closeLocal(err)
@@ -1519,25 +1519,27 @@ func (s *connection) handleHandshakeDoneFrame() error {
 	return nil
 }
 
+// Modificata
 func (s *connection) handleAckFrame(frame *wire.AckFrame, encLevel protocol.EncryptionLevel) error {
+	fmt.Println("Ack")
+	return nil
+	// acked1RTTPacket, err := s.sentPacketHandler.ReceivedAck(frame, encLevel, s.lastPacketReceivedTime)
+	// if err != nil {
+	// 	return err
+	// }
+	// if !acked1RTTPacket {
+	// 	return nil
+	// }
 
-	acked1RTTPacket, err := s.sentPacketHandler.ReceivedAck(frame, encLevel, s.lastPacketReceivedTime)
-	if err != nil {
-		return err
-	}
-	if !acked1RTTPacket {
-		return nil
-	}
-
-	// On the client side: If the packet acknowledged a 1-RTT packet, this confirms the handshake.
-	// This is only possible if the ACK was sent in a 1-RTT packet.
-	// This is an optimization over simply waiting for a HANDSHAKE_DONE frame, see section 4.1.2 of RFC 9001.
-	if s.perspective == protocol.PerspectiveClient && !s.handshakeConfirmed {
-		if err := s.handleHandshakeConfirmed(); err != nil {
-			return err
-		}
-	}
-	return s.cryptoStreamHandler.SetLargest1RTTAcked(frame.LargestAcked())
+	// // On the client side: If the packet acknowledged a 1-RTT packet, this confirms the handshake.
+	// // This is only possible if the ACK was sent in a 1-RTT packet.
+	// // This is an optimization over simply waiting for a HANDSHAKE_DONE frame, see section 4.1.2 of RFC 9001.
+	// if s.perspective == protocol.PerspectiveClient && !s.handshakeConfirmed {
+	// 	if err := s.handleHandshakeConfirmed(); err != nil {
+	// 		return err
+	// 	}
+	// }
+	// return s.cryptoStreamHandler.SetLargest1RTTAcked(frame.LargestAcked())
 }
 
 func (s *connection) handleDatagramFrame(f *wire.DatagramFrame) error {
