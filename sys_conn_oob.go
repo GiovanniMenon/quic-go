@@ -161,7 +161,7 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
-	fmt.Printf("Reading Packet %s \n", time.Now().UTC().Local())
+
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
 		c.messages = c.messages[:batchSize]
 		// replace buffers data buffers up to the packet that has been consumed during the last ReadBatch call
@@ -191,6 +191,9 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		data:       msg.Buffers[0][:msg.N],
 		buffer:     buffer,
 	}
+
+	fmt.Printf("Reading Packet\tTime:%s\tAddr:%s\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr)
+
 	for len(data) > 0 {
 		hdr, body, remainder, err := unix.ParseOneSocketControlMessage(data)
 		if err != nil {
@@ -240,7 +243,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
-	fmt.Printf("Writing Packet %s \n", time.Now().UTC().Local())
+	fmt.Printf("Writing Packet\tTime:%s\tAddr:%s\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
