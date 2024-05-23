@@ -22,9 +22,9 @@ const (
 	// Before validating the client's address, the server won't send more than 3x bytes than it received.
 	amplificationFactor = 3
 	// We use Retry packets to derive an RTT estimate. Make sure we don't set the RTT to a super low value yet.
-	minRTTAfterRetry = 5 * time.Millisecond
+	minRTTAfterRetry = 5 * time.Millisecond //0 * time.Millisecond
 	// The PTO duration uses exponential backoff, but is truncated to a maximum value, as allowed by RFC 8961, section 4.4.
-	maxPTODuration = 60 * time.Second
+	maxPTODuration = 60 * time.Second // 0 * time.Second
 )
 
 type packetNumberSpace struct {
@@ -305,11 +305,15 @@ func (h *sentPacketHandler) getPacketNumberSpace(encLevel protocol.EncryptionLev
 	}
 }
 
+// Modificata
 func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.EncryptionLevel, rcvTime time.Time) (bool /* contained 1-RTT packet */, error) {
+	// fmt.Println("\tAck ricevuto Ack Ignorato")
+	// return false, nil
 	pnSpace := h.getPacketNumberSpace(encLevel)
 
 	largestAcked := ack.LargestAcked()
 	if largestAcked > pnSpace.largestSent {
+		fmt.Println("received ACK for an unsent packet")
 		return false, &qerr.TransportError{
 			ErrorCode:    qerr.ProtocolViolation,
 			ErrorMessage: "received ACK for an unsent packet",
@@ -372,6 +376,9 @@ func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.En
 	}
 	// After this point, we must not use ackedPackets any longer!
 	// We've already returned the buffers.
+
+	// fmt.Printf("ACK ricevuto: LargestAcked=%d, NumAckedPackets=%d, bytes\n", largestAcked, len(ackedPackets))
+
 	ackedPackets = nil //nolint:ineffassign // This is just to be on the safe side.
 
 	// Reset the pto_count unless the client is unsure if the server has validated the client's address.
@@ -386,8 +393,8 @@ func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.En
 	if h.tracer != nil && h.tracer.UpdatedMetrics != nil {
 		h.tracer.UpdatedMetrics(h.rttStats, h.congestion.GetCongestionWindow(), h.bytesInFlight, h.packetsInFlight())
 	}
-
 	h.setLossDetectionTimer()
+
 	return acked1RTTPacket, nil
 }
 
@@ -396,6 +403,7 @@ func (h *sentPacketHandler) GetLowestPacketNotConfirmedAcked() protocol.PacketNu
 }
 
 // Packets are returned in ascending packet number order.
+// Ignorata Poiche' ignoriamo la gestione degli Ack
 func (h *sentPacketHandler) detectAndRemoveAckedPackets(ack *wire.AckFrame, encLevel protocol.EncryptionLevel) ([]*packet, error) {
 	pnSpace := h.getPacketNumberSpace(encLevel)
 	h.ackedPackets = h.ackedPackets[:0]
@@ -489,16 +497,23 @@ func (h *sentPacketHandler) getLossTimeAndSpace() (time.Time, protocol.Encryptio
 	return lossTime, encLevel
 }
 
+// Modificata
+// In questo modo il PTO e' uguale a 0
 func (h *sentPacketHandler) getScaledPTO(includeMaxAckDelay bool) time.Duration {
+	// pto := h.rttStats.PTO(includeMaxAckDelay)
 	pto := h.rttStats.PTO(includeMaxAckDelay) << h.ptoCount
 	if pto > maxPTODuration || pto <= 0 {
 		return maxPTODuration
 	}
+	// return 0
 	return pto
+
 }
 
 // same logic as getLossTimeAndSpace, but for lastAckElicitingPacketTime instead of lossTime
+// Modificata
 func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protocol.EncryptionLevel, ok bool) {
+	// fmt.Println("Cosa fa")
 	// We only send application data probe packets once the handshake is confirmed,
 	// because before that, we don't have the keys to decrypt ACKs sent in 1-RTT packets.
 	if !h.handshakeConfirmed && !h.hasOutstandingCryptoPackets() {
@@ -603,6 +618,7 @@ func (h *sentPacketHandler) setLossDetectionTimer() {
 	}
 }
 
+// Sezione da prendere in esame
 func (h *sentPacketHandler) detectLostPackets(now time.Time, encLevel protocol.EncryptionLevel) error {
 	pnSpace := h.getPacketNumberSpace(encLevel)
 	pnSpace.lossTime = time.Time{}
@@ -772,6 +788,7 @@ func (h *sentPacketHandler) PopPacketNumber(encLevel protocol.EncryptionLevel) p
 	return pn
 }
 
+// Sezione da prendere in esame
 func (h *sentPacketHandler) SendMode(now time.Time) SendMode {
 	numTrackedPackets := h.appDataPackets.history.Len()
 	if h.initialPackets != nil {
