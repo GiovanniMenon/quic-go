@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"os"
-
 	"github.com/quic-go/quic-go/internal/congestion"
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/qerr"
@@ -309,7 +307,7 @@ func (h *sentPacketHandler) getPacketNumberSpace(encLevel protocol.EncryptionLev
 
 // Modificata
 func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.EncryptionLevel, rcvTime time.Time) (bool /* contained 1-RTT packet */, error) {
-	// fmt.Println("Ack ricevuto Ack Ignorato")
+	// fmt.Println("\tAck ricevuto Ack Ignorato")
 	// return false, nil
 	pnSpace := h.getPacketNumberSpace(encLevel)
 
@@ -379,7 +377,7 @@ func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.En
 	// After this point, we must not use ackedPackets any longer!
 	// We've already returned the buffers.
 
-	fmt.Printf("ACK ricevuto: LargestAcked=%d, NumAckedPackets=%d, bytes\n", largestAcked, len(ackedPackets))
+	// fmt.Printf("ACK ricevuto: LargestAcked=%d, NumAckedPackets=%d, bytes\n", largestAcked, len(ackedPackets))
 
 	ackedPackets = nil //nolint:ineffassign // This is just to be on the safe side.
 
@@ -513,8 +511,9 @@ func (h *sentPacketHandler) getScaledPTO(includeMaxAckDelay bool) time.Duration 
 }
 
 // same logic as getLossTimeAndSpace, but for lastAckElicitingPacketTime instead of lossTime
+// Modificata
 func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protocol.EncryptionLevel, ok bool) {
-	fmt.Println("Cosa fa")
+	// fmt.Println("Cosa fa")
 	// We only send application data probe packets once the handshake is confirmed,
 	// because before that, we don't have the keys to decrypt ACKs sent in 1-RTT packets.
 	if !h.handshakeConfirmed && !h.hasOutstandingCryptoPackets() {
@@ -548,7 +547,6 @@ func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protoc
 			encLevel = protocol.Encryption1RTT
 		}
 	}
-	fmt.Fprintln(os.Stdout, []any{"PTO= %t", pto}...)
 	return pto, encLevel, true
 }
 
@@ -790,6 +788,7 @@ func (h *sentPacketHandler) PopPacketNumber(encLevel protocol.EncryptionLevel) p
 	return pn
 }
 
+// Sezione da prendere in esame
 func (h *sentPacketHandler) SendMode(now time.Time) SendMode {
 	numTrackedPackets := h.appDataPackets.history.Len()
 	if h.initialPackets != nil {

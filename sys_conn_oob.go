@@ -5,6 +5,7 @@ package quic
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -160,6 +161,7 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
+	fmt.Printf("Reading Packet %s \n", time.Now().UTC().Local())
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
 		c.messages = c.messages[:batchSize]
 		// replace buffers data buffers up to the packet that has been consumed during the last ReadBatch call
@@ -238,6 +240,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
+	fmt.Printf("Writing Packet %s \n", time.Now().UTC().Local())
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
