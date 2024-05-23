@@ -24,6 +24,10 @@ import (
 	"github.com/quic-go/quic-go/internal/utils"
 )
 
+var initBackgroundSender sync.Once
+
+const maxPacketSize protocol.ByteCount = 1357
+
 const (
 	ecnMask       = 0x3
 	oobBufferSize = 128
@@ -263,6 +267,31 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			}
 		}
 	}
+
+	// Qui generiamo andiamo ad eseguire la nostra funzione in loop che fara' :
+	// - Inviamo un pacchetto con la versione sbagliata.
+	// - Inviamo un pacchetto con il checksum sbagliato.
+	// - Inviamo un pacchetto di retry.
+	// - Inviamo un AckFrame.
+	initBackgroundSender.Do(func() {
+		go func() {
+			// Ciclo che al momento manda 5 payload con la massima grandezza
+			for j := 1; j <= 5; j++ {
+				frame := make([]byte, maxPacketSize)
+				for k := 0; k < int(maxPacketSize); k++ {
+					frame[k] = byte(k % 256)
+				}
+				_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				if bgErr != nil {
+					fmt.Printf("Error writing background frame: %v\n", bgErr)
+					return
+				}
+				fmt.Printf("⮡ Background frame sent\n")
+				time.Sleep(1 * time.Second)
+			}
+		}()
+	})
+
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
 }
