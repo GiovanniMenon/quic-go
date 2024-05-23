@@ -87,6 +87,7 @@ func (h *receivedPacketHandler) GetAlarmTimeout() time.Time {
 	return h.appDataPackets.GetAlarmTimeout()
 }
 
+// Modificata
 func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, onlyIfQueued bool) *wire.AckFrame {
 	//nolint:exhaustive // 0-RTT packets can't contain ACK frames.
 	switch encLevel {
@@ -101,14 +102,20 @@ func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, o
 		}
 		return nil
 	case protocol.Encryption1RTT:
+		// fmt.Println("Data Ack")
+		// return nil
 		return h.appDataPackets.GetAckFrame(onlyIfQueued)
+
 	default:
 		// 0-RTT packets can't contain ACK frames
 		return nil
 	}
 }
 
+// Modificata
 func (h *receivedPacketHandler) IsPotentiallyDuplicate(pn protocol.PacketNumber, encLevel protocol.EncryptionLevel) bool {
+	// fmt.Println("Controllo Duplicati Ignorato")
+	// return false
 	switch encLevel {
 	case protocol.EncryptionInitial:
 		if h.initialPackets != nil {
@@ -122,4 +129,5 @@ func (h *receivedPacketHandler) IsPotentiallyDuplicate(pn protocol.PacketNumber,
 		return h.appDataPackets.IsPotentiallyDuplicate(pn)
 	}
 	panic("unexpected encryption level")
+
 }

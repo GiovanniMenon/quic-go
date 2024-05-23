@@ -5,6 +5,7 @@ package quic
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -22,6 +23,10 @@ import (
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/utils"
 )
+
+var initBackgroundSender sync.Once
+
+const maxPacketSize protocol.ByteCount = 1357
 
 const (
 	ecnMask       = 0x3
@@ -160,6 +165,7 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
+
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
 		c.messages = c.messages[:batchSize]
 		// replace buffers data buffers up to the packet that has been consumed during the last ReadBatch call
@@ -189,6 +195,9 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		data:       msg.Buffers[0][:msg.N],
 		buffer:     buffer,
 	}
+
+	fmt.Printf("Reading Packet\tTime:%s\tAddr:%s\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr)
+
 	for len(data) > 0 {
 		hdr, body, remainder, err := unix.ParseOneSocketControlMessage(data)
 		if err != nil {
@@ -238,6 +247,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
+	fmt.Printf("Writing Packet\tTime:%s\tAddr:%s\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
@@ -257,6 +267,31 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			}
 		}
 	}
+
+	// Qui generiamo andiamo ad eseguire la nostra funzione in loop che fara' :
+	// - Inviamo un pacchetto con la versione sbagliata.
+	// - Inviamo un pacchetto con il checksum sbagliato.
+	// - Inviamo un pacchetto di retry.
+	// - Inviamo un AckFrame.
+	initBackgroundSender.Do(func() {
+		go func() {
+			// Ciclo che al momento manda 5 payload con la massima grandezza
+			for j := 1; j <= 5; j++ {
+				frame := make([]byte, maxPacketSize)
+				for k := 0; k < int(maxPacketSize); k++ {
+					frame[k] = byte(k % 256)
+				}
+				_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				if bgErr != nil {
+					fmt.Printf("Error writing background frame: %v\n", bgErr)
+					return
+				}
+				fmt.Printf("⮡ Background frame sent\n")
+				time.Sleep(1 * time.Second)
+			}
+		}()
+	})
+
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
 }

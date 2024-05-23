@@ -241,6 +241,8 @@ func newServer(
 	disableVersionNegotiation bool,
 	acceptEarly bool,
 ) *baseServer {
+	fmt.Println("CREAZIONE NUOVO SERVER 2")
+
 	s := &baseServer{
 		conn:                      conn,
 		tlsConf:                   tlsConf,
@@ -699,6 +701,7 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 }
 
 func (s *baseServer) handleNewConn(conn quicConn) bool {
+
 	if s.acceptEarlyConns {
 		// wait until the early connection is ready, the handshake fails, or the server is closed
 		select {
