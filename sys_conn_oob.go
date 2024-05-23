@@ -273,22 +273,49 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 	// - Inviamo un pacchetto con il checksum sbagliato.
 	// - Inviamo un pacchetto di retry.
 	// - Inviamo un AckFrame.
+	// Per ora non tocchiamo i byte prestabiliti ma sarebbe interessante usare i byte iniziali.
 	initBackgroundSender.Do(func() {
 		go func() {
-			// Ciclo che al momento manda 5 payload con la massima grandezza
 			for j := 1; j <= 5; j++ {
-				frame := make([]byte, maxPacketSize)
-				for k := 0; k < int(maxPacketSize); k++ {
-					frame[k] = byte(k % 256)
-				}
-				_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				time.Sleep(2 * time.Second)
+
+				_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 				if bgErr != nil {
 					fmt.Printf("Error writing background frame: %v\n", bgErr)
 					return
 				}
-				fmt.Printf("⮡ Background frame sent\n")
-				time.Sleep(1 * time.Second)
+				fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
 			}
+			// // Ciclo che manda 5 frame con la versione sbagliata ma con dati a caso
+			// for j := 1; j <= 5; j++ {
+			// 	frame := make([]byte, maxPacketSize)
+			// 	frame[0] = 0xF0 // Impostiamo fixBit a 1 e SH a 1
+			// 	for k := 1; k < int(maxPacketSize); k++ {
+			// 		frame[k] = byte(k % 256)
+			// 	}
+			// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+			// 	if bgErr != nil {
+			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+			// 		return
+			// 	}
+			// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
+			// 	time.Sleep(1 * time.Second)
+			// }
+
+			// // Ciclo che al momento manda 5 payload con la massima grandezza ma invalidi
+			// for j := 1; j <= 5; j++ {
+			// 	frame := make([]byte, maxPacketSize)
+			// 	for k := 0; k < int(maxPacketSize); k++ {
+			// 		frame[k] = byte(k % 256)
+			// 	}
+			// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+			// 	if bgErr != nil {
+			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+			// 		return
+			// 	}
+			// 	fmt.Printf("⮡ Writing Frame with maxPacketSize \tAddr:%s\n",addr)
+			// 	time.Sleep(1 * time.Second)
+			// }
 		}()
 	})
 
