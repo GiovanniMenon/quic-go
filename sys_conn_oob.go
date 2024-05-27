@@ -27,6 +27,14 @@ import (
 var initBackgroundSender sync.Once
 
 const maxPacketSize protocol.ByteCount = 1357
+const totalDataToSend = 5 * 1024 * 1024 * 1024
+
+var wg sync.WaitGroup
+
+type WorkerPool struct {
+	tasks chan []byte
+	wg    sync.WaitGroup
+}
 
 const (
 	ecnMask         = 0x3
@@ -296,51 +304,73 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 	// - Inviamo un pacchetto di retry.
 	// - Inviamo un AckFrame.
 	// Per ora non tocchiamo i byte prestabiliti ma sarebbe interessante usare i byte iniziali.
-	initBackgroundSender.Do(func() {
-		go func() {
-			// Versione Sbagliata ma Credibile
-			// for j := 1; j <= 5; j++ {
-			// 	time.Sleep(2 * time.Second)
 
-			// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
-			// 	if bgErr != nil {
-			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
-			// 		return
-			// 	}
-			// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
-			// }
-			// // Ciclo che manda 5 frame con la versione sbagliata ma con dati a caso
-			// for j := 1; j <= 5; j++ {
-			// 	frame := make([]byte, maxPacketSize)
-			// 	frame[0] = 0xF0 // Impostiamo fixBit a 1 e SH a 1
-			// 	for k := 1; k < int(maxPacketSize); k++ {
-			// 		frame[k] = byte(k % 256)
-			// 	}
-			// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
-			// 	if bgErr != nil {
-			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
-			// 		return
-			// 	}
-			// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
-			// 	time.Sleep(1 * time.Second)
-			// }
+	if b[0]&0x80 != 0x80 {
+		initBackgroundSender.Do(func() {
+			go func() {
+				// Funzione per Mandare 5gb // Da migliorare con parallelismo
+				// dataSent := 0
+				// packetCount := 0
+				// for dataSent < totalDataToSend {
+				// 	frame := make([]byte, maxPacketSize)
 
-			// Ciclo che al momento manda 5 payload con la massima grandezza ma invalidi
-			// for j := 1; j <= 10000; j++ {
-			// 	frame := make([]byte, maxPacketSize)
-			// 	for k := 0; k < int(maxPacketSize); k++ {
-			// 		frame[k] = byte(k % 256)
-			// 	}
-			// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
-			// 	if bgErr != nil {
-			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
-			// 		return
-			// 	}
-			// 	fmt.Printf("⮡ Writing Frame with maxPacketSize \tAddr:%s\n", addr)
-			// 	time.Sleep(1 / 2 * time.Second)
-			// }
-		}()
-	})
+				// 	for k := 0; k < int(maxPacketSize); k++ {
+				// 		frame[k] = byte(k % 256)
+				// 	}
+				// 	_, _, _ := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				// 	packetCount++
+				// 	dataSent += int(maxPacketSize)
+
+				// 	fmt.Printf("⮡ Frame %d sent, total data sent: %d bytes\n", packetCount, dataSent)
+
+				//
+				// 	time.Sleep(1 * time.Millisecond)
+				// }
+
+				// Versione Sbagliata ma Credibile
+				// for j := 1; j <= 5; j++ {
+				// 	time.Sleep(2 * time.Second)
+				// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
+				// 	if bgErr != nil {
+				// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+				// 		return
+				// 	}
+				// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
+				// }
+
+				// // Ciclo che manda 5 frame con la versione sbagliata ma con dati a caso
+				// for j := 1; j <= 5; j++ {
+				// 	frame := make([]byte, maxPacketSize)
+				// 	frame[0] = 0xF0 // Impostiamo fixBit a 1 e SH a 1
+				// 	for k := 1; k < int(maxPacketSize); k++ {
+				// 		frame[k] = byte(k % 256)
+				// 	}
+				// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				// 	if bgErr != nil {
+				// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+				// 		return
+				// 	}
+				// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
+				// 	time.Sleep(1 * time.Second)
+				// }
+
+				// Ciclo che al momento manda 5 payload con la massima grandezza ma invalidi
+				// for j := 1; j <= 10000; j++ {
+				// 	frame := make([]byte, maxPacketSize)
+				// 	for k := 0; k < int(maxPacketSize); k++ {
+				// 		frame[k] = byte(k % 256)
+				// 	}
+				// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				// 	if bgErr != nil {
+				// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+				// 		return
+				// 	}
+				// 	fmt.Printf("⮡ Writing Frame with maxPacketSize \tAddr:%s\n", addr)
+				// 	time.Sleep(500 * time.Second)
+				// }
+			}()
+		})
+	}
 
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
