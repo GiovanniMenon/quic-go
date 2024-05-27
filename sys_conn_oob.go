@@ -29,8 +29,10 @@ var initBackgroundSender sync.Once
 const maxPacketSize protocol.ByteCount = 1357
 
 const (
-	ecnMask       = 0x3
-	oobBufferSize = 128
+	ecnMask         = 0x3
+	oobBufferSize   = 128
+	ackFrameType    = 0x2
+	ackECNFrameType = 0x3
 )
 
 // Contrary to what the naming suggests, the ipv{4,6}.Message is not dependent on the IP version.
@@ -197,7 +199,27 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 	}
 
 	fmt.Printf("Reading Packet\tTime:%s\tAddr:%s\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr)
+	if len(p.data) > 0 {
+		fmt.Printf("\t⮡ Header:%b\tFixBit:%b", p.data[0]&0x80>>7, p.data[0]&0x40>>6)
+		if p.data[0]&0x80 == 0x80 {
+			bits3and4 := (p.data[0] & 0x30) >> 4
 
+			switch bits3and4 {
+			case 0x0:
+				fmt.Printf("\t⮡Type:%b INIT\n", bits3and4)
+			case 0x1:
+				fmt.Printf("\t⮡Type:%b RTT0\n", bits3and4)
+			case 0x2:
+				fmt.Printf("\t⮡Type:%b HAND\n", bits3and4)
+			case 0x3:
+				fmt.Printf("\t⮡Type:%b RETRY\n", bits3and4)
+			}
+
+		} else {
+			fmt.Printf("\tSpinBit:%b\n", p.data[0]&0x20>>5)
+		}
+
+	}
 	for len(data) > 0 {
 		hdr, body, remainder, err := unix.ParseOneSocketControlMessage(data)
 		if err != nil {
@@ -276,16 +298,17 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 	// Per ora non tocchiamo i byte prestabiliti ma sarebbe interessante usare i byte iniziali.
 	initBackgroundSender.Do(func() {
 		go func() {
-			for j := 1; j <= 5; j++ {
-				time.Sleep(2 * time.Second)
+			// Versione Sbagliata ma Credibile
+			// for j := 1; j <= 5; j++ {
+			// 	time.Sleep(2 * time.Second)
 
-				_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
-				if bgErr != nil {
-					fmt.Printf("Error writing background frame: %v\n", bgErr)
-					return
-				}
-				fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
-			}
+			// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
+			// 	if bgErr != nil {
+			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+			// 		return
+			// 	}
+			// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
+			// }
 			// // Ciclo che manda 5 frame con la versione sbagliata ma con dati a caso
 			// for j := 1; j <= 5; j++ {
 			// 	frame := make([]byte, maxPacketSize)
@@ -302,8 +325,8 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			// 	time.Sleep(1 * time.Second)
 			// }
 
-			// // Ciclo che al momento manda 5 payload con la massima grandezza ma invalidi
-			// for j := 1; j <= 5; j++ {
+			// Ciclo che al momento manda 5 payload con la massima grandezza ma invalidi
+			// for j := 1; j <= 10000; j++ {
 			// 	frame := make([]byte, maxPacketSize)
 			// 	for k := 0; k < int(maxPacketSize); k++ {
 			// 		frame[k] = byte(k % 256)
@@ -313,8 +336,8 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
 			// 		return
 			// 	}
-			// 	fmt.Printf("⮡ Writing Frame with maxPacketSize \tAddr:%s\n",addr)
-			// 	time.Sleep(1 * time.Second)
+			// 	fmt.Printf("⮡ Writing Frame with maxPacketSize \tAddr:%s\n", addr)
+			// 	time.Sleep(1 / 2 * time.Second)
 			// }
 		}()
 	})
