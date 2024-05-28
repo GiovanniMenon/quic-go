@@ -16,7 +16,7 @@ type StopSendingFrame struct {
 
 // parseStopSendingFrame parses a STOP_SENDING frame
 func parseStopSendingFrame(b []byte, _ protocol.Version) (*StopSendingFrame, int, error) {
-	fmt.Printf("\t  Stop Sending Frame:\n")
+	fmt.Printf("\t⮡ The Packet contain an StopSending frame\n")
 	startLen := len(b)
 	streamID, l, err := quicvarint.Parse(b)
 	if err != nil {

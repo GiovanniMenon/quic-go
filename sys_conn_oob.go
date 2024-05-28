@@ -206,7 +206,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		buffer:     buffer,
 	}
 
-	fmt.Printf("Reading Packet\tTime:%s\tAddr:%s\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr)
+	fmt.Printf("Reading Packet\tTime:%s\tAddr:%s\tSize:%d\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr, len(p.data)+42)
 	if len(p.data) > 0 {
 		fmt.Printf("\t⮡ Header:%b\tFixBit:%b", p.data[0]&0x80>>7, p.data[0]&0x40>>6)
 		if p.data[0]&0x80 == 0x80 {
@@ -277,7 +277,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
-	fmt.Printf("Writing Packet\tTime:%s\tAddr:%s\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr)
+	fmt.Printf("Writing Packet\tTime:%s\tAddr:%s\tSize:%d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
