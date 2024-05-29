@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"os"
-
 	"github.com/quic-go/quic-go/internal/congestion"
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/qerr"
@@ -513,18 +511,23 @@ func (h *sentPacketHandler) getScaledPTO(includeMaxAckDelay bool) time.Duration 
 
 // same logic as getLossTimeAndSpace, but for lastAckElicitingPacketTime instead of lossTime
 func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protocol.EncryptionLevel, ok bool) {
-	fmt.Println("Cosa fa")
+
+	// Setto il PTO a 0
+	pto = time.Time{}
+
 	// We only send application data probe packets once the handshake is confirmed,
 	// because before that, we don't have the keys to decrypt ACKs sent in 1-RTT packets.
 	if !h.handshakeConfirmed && !h.hasOutstandingCryptoPackets() {
 		if h.peerCompletedAddressValidation {
 			return
 		}
-		t := time.Now().Add(h.getScaledPTO(false))
+		//t := time.Now().Add(h.getScaledPTO(false))
 		if h.initialPackets != nil {
-			return t, protocol.EncryptionInitial, true
+			//return t, protocol.EncryptionInitial, true
+			return pto, protocol.EncryptionInitial, true
 		}
-		return t, protocol.EncryptionHandshake, true
+		//return t, protocol.EncryptionHandshake, true
+		return pto, protocol.EncryptionHandshake, true
 	}
 
 	if h.initialPackets != nil {
@@ -547,8 +550,8 @@ func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protoc
 			encLevel = protocol.Encryption1RTT
 		}
 	}
-	fmt.Fprintln(os.Stdout, []any{"PTO= %t", pto}...)
-	return pto, encLevel, true
+
+	return time.Time{}, encLevel, true
 }
 
 func (h *sentPacketHandler) hasOutstandingCryptoPackets() bool {
