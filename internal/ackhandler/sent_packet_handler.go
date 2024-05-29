@@ -22,9 +22,9 @@ const (
 	// Before validating the client's address, the server won't send more than 3x bytes than it received.
 	amplificationFactor = 3
 	// We use Retry packets to derive an RTT estimate. Make sure we don't set the RTT to a super low value yet.
-	minRTTAfterRetry = 0 * time.Millisecond //5 * time.Millisecond
+	minRTTAfterRetry = 5 * time.Millisecond //0 * time.Millisecond
 	// The PTO duration uses exponential backoff, but is truncated to a maximum value, as allowed by RFC 8961, section 4.4.
-	maxPTODuration = 0 * time.Second //60 * time.Second
+	maxPTODuration = 60 * time.Second // 0 * time.Second
 )
 
 type packetNumberSpace struct {
@@ -499,16 +499,18 @@ func (h *sentPacketHandler) getLossTimeAndSpace() (time.Time, protocol.Encryptio
 // Modificata
 // In questo modo il PTO e' uguale a 0
 func (h *sentPacketHandler) getScaledPTO(includeMaxAckDelay bool) time.Duration {
-	// pto := h.rttStats.PTO(includeMaxAckDelay) << h.ptoCount
-	pto := h.rttStats.PTO(includeMaxAckDelay)
+	// pto := h.rttStats.PTO(includeMaxAckDelay)
+	pto := h.rttStats.PTO(includeMaxAckDelay) << h.ptoCount
 	if pto > maxPTODuration || pto <= 0 {
 		return maxPTODuration
 	}
-	//return pto
-	return 0
+	// return 0
+	return pto
+
 }
 
 // same logic as getLossTimeAndSpace, but for lastAckElicitingPacketTime instead of lossTime
+// Modificata
 func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protocol.EncryptionLevel, ok bool) {
 
 	// Setto il PTO a 0
@@ -791,6 +793,7 @@ func (h *sentPacketHandler) PopPacketNumber(encLevel protocol.EncryptionLevel) p
 	return pn
 }
 
+// Sezione da prendere in esame
 func (h *sentPacketHandler) SendMode(now time.Time) SendMode {
 	numTrackedPackets := h.appDataPackets.history.Len()
 	if h.initialPackets != nil {

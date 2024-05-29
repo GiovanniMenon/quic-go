@@ -16,6 +16,7 @@ type ConnectionCloseFrame struct {
 	ReasonPhrase       string
 }
 
+// Modificata
 func parseConnectionCloseFrame(b []byte, typ uint64, _ protocol.Version) (*ConnectionCloseFrame, int, error) {
 	fmt.Printf("\t⮡ The Packet contain an ConnectionClose Frame\n")
 	startLen := len(b)
