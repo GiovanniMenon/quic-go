@@ -241,8 +241,6 @@ func newServer(
 	disableVersionNegotiation bool,
 	acceptEarly bool,
 ) *baseServer {
-	fmt.Println("CREAZIONE NUOVO SERVER 2")
-
 	s := &baseServer{
 		conn:                      conn,
 		tlsConf:                   tlsConf,

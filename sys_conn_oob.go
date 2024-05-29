@@ -174,6 +174,8 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
+// Giovanni Menon
+// Modified : Track and Log all Packet
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
@@ -275,6 +277,8 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 	return p, nil
 }
 
+// Giovanni Menon
+// Modified : Track and Log all Write Packet and Inject In Background Others
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
 	fmt.Printf("Writing Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)

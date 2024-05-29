@@ -87,8 +87,9 @@ func (h *receivedPacketHandler) GetAlarmTimeout() time.Time {
 	return h.appDataPackets.GetAlarmTimeout()
 }
 
-// Funzione che gestisce il comportamento dei pacchetti ricevuti e il loro ACK.
-// Non modifico Poiche' il nostro compito e' ignorare gli ack ricevuti.
+// Giovanni Menon
+// Function that handles the behavior of received packets and their ACKs.
+// Not modified because our task is to ignore received ACKs.
 func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, onlyIfQueued bool) *wire.AckFrame {
 	//nolint:exhaustive // 0-RTT packets can't contain ACK frames.
 	switch encLevel {
@@ -103,19 +104,20 @@ func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, o
 		}
 		return nil
 	case protocol.Encryption1RTT:
-		fmt.Println("Data Ack")
-		return nil
-		//return h.appDataPackets.GetAckFrame(onlyIfQueued)
+		return h.appDataPackets.GetAckFrame(onlyIfQueued)
 	default:
 		// 0-RTT packets can't contain ACK frames
 		return nil
 	}
 }
 
-// Modificata
+// Giovanni Menon
+// Modified : Check is Ignored
 func (h *receivedPacketHandler) IsPotentiallyDuplicate(pn protocol.PacketNumber, encLevel protocol.EncryptionLevel) bool {
-	fmt.Println("IsPotentiallyDuplicate Check Ignored")
+
+	fmt.Println("\t⮡ IsPotentiallyDuplicate Check Ignored")
 	return false
+
 	// switch encLevel {
 	// case protocol.EncryptionInitial:
 	// 	if h.initialPackets != nil {
@@ -129,5 +131,4 @@ func (h *receivedPacketHandler) IsPotentiallyDuplicate(pn protocol.PacketNumber,
 	// 	return h.appDataPackets.IsPotentiallyDuplicate(pn)
 	// }
 	// panic("unexpected encryption level")
-
 }
