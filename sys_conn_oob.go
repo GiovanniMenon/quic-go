@@ -5,6 +5,7 @@ package quic
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -159,7 +160,10 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
+// Giovanni Menon
+// Modified : Track and Log all Packet
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
+
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
 		c.messages = c.messages[:batchSize]
 		// replace buffers data buffers up to the packet that has been consumed during the last ReadBatch call
@@ -188,6 +192,29 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		rcvTime:    time.Now(),
 		data:       msg.Buffers[0][:msg.N],
 		buffer:     buffer,
+	}
+
+	fmt.Printf("Reading Packet\tTime: %s\tAddr: %s\tSize: %d\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr, len(p.data)+42)
+	if len(p.data) > 0 {
+		fmt.Printf("\t⮡ Header:%b\tFixBit:%b", p.data[0]&0x80>>7, p.data[0]&0x40>>6)
+		if p.data[0]&0x80 == 0x80 {
+			bits3and4 := (p.data[0] & 0x30) >> 4
+
+			switch bits3and4 {
+			case 0x0:
+				fmt.Printf("\t⮡Type:%b INIT\n", bits3and4)
+			case 0x1:
+				fmt.Printf("\t⮡Type:%b RTT0\n", bits3and4)
+			case 0x2:
+				fmt.Printf("\t⮡Type:%b HAND\n", bits3and4)
+			case 0x3:
+				fmt.Printf("\t⮡Type:%b RETRY\n", bits3and4)
+			}
+
+		} else {
+			fmt.Printf("\tSpinBit:%b\n", p.data[0]&0x20>>5)
+		}
+
 	}
 	for len(data) > 0 {
 		hdr, body, remainder, err := unix.ParseOneSocketControlMessage(data)
@@ -236,8 +263,11 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 	return p, nil
 }
 
+// Giovanni Menon
+// Modified : Track and Log all Write Packet and Inject In Background Others
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
+	fmt.Printf("Writing Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
@@ -257,6 +287,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			}
 		}
 	}
+
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
 }

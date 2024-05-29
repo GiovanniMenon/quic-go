@@ -149,7 +149,6 @@ func (t *Transport) ListenEarly(tlsConf *tls.Config, conf *Config) (*EarlyListen
 
 func (t *Transport) createServer(tlsConf *tls.Config, conf *Config, allow0RTT bool) (*baseServer, error) {
 
-	//Linea Aggiunta per la stampa alla creazione di un server
 	fmt.Println("===================================")
 	fmt.Println("Giovanni Menon Fork Version")
 	fmt.Println("===================================")
