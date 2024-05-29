@@ -87,7 +87,8 @@ func (h *receivedPacketHandler) GetAlarmTimeout() time.Time {
 	return h.appDataPackets.GetAlarmTimeout()
 }
 
-// Modificata
+// Funzione che gestisce il comportamento dei pacchetti ricevuti e il loro ACK.
+// Non modifico Poiche' il nostro compito e' ignorare gli ack ricevuti.
 func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, onlyIfQueued bool) *wire.AckFrame {
 	//nolint:exhaustive // 0-RTT packets can't contain ACK frames.
 	switch encLevel {
@@ -104,8 +105,7 @@ func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, o
 	case protocol.Encryption1RTT:
 		fmt.Println("Data Ack")
 		return nil
-		// return h.appDataPackets.GetAckFrame(onlyIfQueued)
-
+		//return h.appDataPackets.GetAckFrame(onlyIfQueued)
 	default:
 		// 0-RTT packets can't contain ACK frames
 		return nil
@@ -114,20 +114,20 @@ func (h *receivedPacketHandler) GetAckFrame(encLevel protocol.EncryptionLevel, o
 
 // Modificata
 func (h *receivedPacketHandler) IsPotentiallyDuplicate(pn protocol.PacketNumber, encLevel protocol.EncryptionLevel) bool {
-	fmt.Println("Controllo Duplicati Ignorato")
-	return false
-	// switch encLevel {
-	// case protocol.EncryptionInitial:
-	// 	if h.initialPackets != nil {
-	// 		return h.initialPackets.IsPotentiallyDuplicate(pn)
-	// 	}
-	// case protocol.EncryptionHandshake:
-	// 	if h.handshakePackets != nil {
-	// 		return h.handshakePackets.IsPotentiallyDuplicate(pn)
-	// 	}
-	// case protocol.Encryption0RTT, protocol.Encryption1RTT:
-	// 	return h.appDataPackets.IsPotentiallyDuplicate(pn)
-	// }
-	// panic("unexpected encryption level")
+	// fmt.Println("Controllo Duplicati Ignorato")
+	// return false
+	switch encLevel {
+	case protocol.EncryptionInitial:
+		if h.initialPackets != nil {
+			return h.initialPackets.IsPotentiallyDuplicate(pn)
+		}
+	case protocol.EncryptionHandshake:
+		if h.handshakePackets != nil {
+			return h.handshakePackets.IsPotentiallyDuplicate(pn)
+		}
+	case protocol.Encryption0RTT, protocol.Encryption1RTT:
+		return h.appDataPackets.IsPotentiallyDuplicate(pn)
+	}
+	panic("unexpected encryption level")
 
 }

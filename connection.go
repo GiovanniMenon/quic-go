@@ -1519,15 +1519,14 @@ func (s *connection) handleHandshakeDoneFrame() error {
 	return nil
 }
 
-// Modificata
 func (s *connection) handleAckFrame(frame *wire.AckFrame, encLevel protocol.EncryptionLevel) error {
-	fmt.Println("Ack")
 	return nil
 	// acked1RTTPacket, err := s.sentPacketHandler.ReceivedAck(frame, encLevel, s.lastPacketReceivedTime)
 	// if err != nil {
 	// 	return err
 	// }
 	// if !acked1RTTPacket {
+
 	// 	return nil
 	// }
 
