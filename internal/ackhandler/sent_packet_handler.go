@@ -13,6 +13,7 @@ import (
 	"github.com/quic-go/quic-go/logging"
 )
 
+// Not Modified minRTTAfterRetry and maxPTODuration
 const (
 	// Maximum reordering in time space before time based loss detection considers a packet lost.
 	// Specified as an RTT multiplier.
@@ -305,10 +306,10 @@ func (h *sentPacketHandler) getPacketNumberSpace(encLevel protocol.EncryptionLev
 	}
 }
 
-// Modificata
+// Giovanni Menon
+// Function that handles the behavior of sent packets and their ACKs.
+// Function not modified.
 func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.EncryptionLevel, rcvTime time.Time) (bool /* contained 1-RTT packet */, error) {
-	// fmt.Println("\tAck ricevuto Ack Ignorato")
-	// return false, nil
 	pnSpace := h.getPacketNumberSpace(encLevel)
 
 	largestAcked := ack.LargestAcked()
@@ -377,8 +378,6 @@ func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.En
 	// After this point, we must not use ackedPackets any longer!
 	// We've already returned the buffers.
 
-	// fmt.Printf("ACK ricevuto: LargestAcked=%d, NumAckedPackets=%d, bytes\n", largestAcked, len(ackedPackets))
-
 	ackedPackets = nil //nolint:ineffassign // This is just to be on the safe side.
 
 	// Reset the pto_count unless the client is unsure if the server has validated the client's address.
@@ -403,7 +402,6 @@ func (h *sentPacketHandler) GetLowestPacketNotConfirmedAcked() protocol.PacketNu
 }
 
 // Packets are returned in ascending packet number order.
-// Ignorata Poiche' ignoriamo la gestione degli Ack
 func (h *sentPacketHandler) detectAndRemoveAckedPackets(ack *wire.AckFrame, encLevel protocol.EncryptionLevel) ([]*packet, error) {
 	pnSpace := h.getPacketNumberSpace(encLevel)
 	h.ackedPackets = h.ackedPackets[:0]
@@ -497,23 +495,18 @@ func (h *sentPacketHandler) getLossTimeAndSpace() (time.Time, protocol.Encryptio
 	return lossTime, encLevel
 }
 
-// Modificata
-// In questo modo il PTO e' uguale a 0
+// Giovanni Menon
+// Not Modified : Return the normal PTO
 func (h *sentPacketHandler) getScaledPTO(includeMaxAckDelay bool) time.Duration {
-	// pto := h.rttStats.PTO(includeMaxAckDelay)
 	pto := h.rttStats.PTO(includeMaxAckDelay) << h.ptoCount
 	if pto > maxPTODuration || pto <= 0 {
 		return maxPTODuration
 	}
-	// return 0
 	return pto
-
 }
 
 // same logic as getLossTimeAndSpace, but for lastAckElicitingPacketTime instead of lossTime
-// Modificata
 func (h *sentPacketHandler) getPTOTimeAndSpace() (pto time.Time, encLevel protocol.EncryptionLevel, ok bool) {
-	// fmt.Println("Cosa fa")
 	// We only send application data probe packets once the handshake is confirmed,
 	// because before that, we don't have the keys to decrypt ACKs sent in 1-RTT packets.
 	if !h.handshakeConfirmed && !h.hasOutstandingCryptoPackets() {
