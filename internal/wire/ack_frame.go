@@ -2,6 +2,7 @@ package wire
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -22,6 +23,7 @@ type AckFrame struct {
 
 // parseAckFrame reads an ACK frame
 func parseAckFrame(frame *AckFrame, b []byte, typ uint64, ackDelayExponent uint8, _ protocol.Version) (int, error) {
+	fmt.Printf("\t⮡ The Packet contain an ACK frame\n")
 	startLen := len(b)
 	ecn := typ == ackECNFrameType
 
