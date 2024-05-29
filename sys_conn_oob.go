@@ -5,6 +5,7 @@ package quic
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -23,9 +24,23 @@ import (
 	"github.com/quic-go/quic-go/internal/utils"
 )
 
+var initBackgroundSender sync.Once
+
+const maxPacketSize protocol.ByteCount = 1357
+const totalDataToSend = 5 * 1024 * 1024 * 1024
+
+var wg sync.WaitGroup
+
+type WorkerPool struct {
+	tasks chan []byte
+	wg    sync.WaitGroup
+}
+
 const (
-	ecnMask       = 0x3
-	oobBufferSize = 128
+	ecnMask         = 0x3
+	oobBufferSize   = 128
+	ackFrameType    = 0x2
+	ackECNFrameType = 0x3
 )
 
 // Contrary to what the naming suggests, the ipv{4,6}.Message is not dependent on the IP version.
@@ -160,6 +175,7 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
+
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
 		c.messages = c.messages[:batchSize]
 		// replace buffers data buffers up to the packet that has been consumed during the last ReadBatch call
@@ -188,6 +204,29 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		rcvTime:    time.Now(),
 		data:       msg.Buffers[0][:msg.N],
 		buffer:     buffer,
+	}
+
+	fmt.Printf("Reading Packet\tTime: %s\tAddr: %s\tSize: %d\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr, len(p.data)+42)
+	if len(p.data) > 0 {
+		fmt.Printf("\t⮡ Header:%b\tFixBit:%b", p.data[0]&0x80>>7, p.data[0]&0x40>>6)
+		if p.data[0]&0x80 == 0x80 {
+			bits3and4 := (p.data[0] & 0x30) >> 4
+
+			switch bits3and4 {
+			case 0x0:
+				fmt.Printf("\t⮡Type:%b INIT\n", bits3and4)
+			case 0x1:
+				fmt.Printf("\t⮡Type:%b RTT0\n", bits3and4)
+			case 0x2:
+				fmt.Printf("\t⮡Type:%b HAND\n", bits3and4)
+			case 0x3:
+				fmt.Printf("\t⮡Type:%b RETRY\n", bits3and4)
+			}
+
+		} else {
+			fmt.Printf("\tSpinBit:%b\n", p.data[0]&0x20>>5)
+		}
+
 	}
 	for len(data) > 0 {
 		hdr, body, remainder, err := unix.ParseOneSocketControlMessage(data)
@@ -238,6 +277,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
+	fmt.Printf("Writing Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
@@ -257,6 +297,81 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			}
 		}
 	}
+
+	// Qui generiamo andiamo ad eseguire la nostra funzione in loop che fara' :
+	// - Inviamo un pacchetto con la versione sbagliata.
+	// - Inviamo un pacchetto con il checksum sbagliato.
+	// - Inviamo un pacchetto di retry.
+	// - Inviamo un AckFrame.
+	// Per ora non tocchiamo i byte prestabiliti ma sarebbe interessante usare i byte iniziali.
+
+	if b[0]&0x80 != 0x80 {
+		initBackgroundSender.Do(func() {
+			go func() {
+				// Funzione per Mandare 5gb // Da migliorare con parallelismo
+				// dataSent := 0
+				// packetCount := 0
+				// for dataSent < totalDataToSend {
+				// 	frame := make([]byte, maxPacketSize)
+
+				// 	for k := 0; k < int(maxPacketSize); k++ {
+				// 		frame[k] = byte(k % 256)
+				// 	}
+				// 	_, _, _ := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				// 	packetCount++
+				// 	dataSent += int(maxPacketSize)
+
+				// 	fmt.Printf("⮡ Frame %d sent, total data sent: %d bytes\n", packetCount, dataSent)
+
+				//
+				// 	time.Sleep(1 * time.Millisecond)
+				// }
+
+				// Versione Sbagliata ma Credibile
+				// for j := 1; j <= 5; j++ {
+				// 	time.Sleep(2 * time.Second)
+				// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
+				// 	if bgErr != nil {
+				// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+				// 		return
+				// 	}
+				// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
+				// }
+
+				// // Ciclo che manda 5 frame con la versione sbagliata ma con dati a caso
+				// for j := 1; j <= 5; j++ {
+				// 	frame := make([]byte, maxPacketSize)
+				// 	frame[0] = 0xF0 // Impostiamo fixBit a 1 e SH a 1
+				// 	for k := 1; k < int(maxPacketSize); k++ {
+				// 		frame[k] = byte(k % 256)
+				// 	}
+				// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				// 	if bgErr != nil {
+				// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+				// 		return
+				// 	}
+				// 	fmt.Printf("⮡ Writing Frame with Wrong Version \tAddr:%s\n", addr)
+				// 	time.Sleep(1 * time.Second)
+				// }
+
+				// Ciclo che al momento manda 5 payload con la massima grandezza ma invalidi
+				// for j := 1; j <= 10000; j++ {
+				// 	frame := make([]byte, maxPacketSize)
+				// 	for k := 0; k < int(maxPacketSize); k++ {
+				// 		frame[k] = byte(k % 256)
+				// 	}
+				// 	_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+				// 	if bgErr != nil {
+				// 		fmt.Printf("Error writing background frame: %v\n", bgErr)
+				// 		return
+				// 	}
+				// 	fmt.Printf("⮡ Writing Frame with maxPacketSize \tAddr:%s\n", addr)
+				// 	time.Sleep(500 * time.Second)
+				// }
+			}()
+		})
+	}
+
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
 }
