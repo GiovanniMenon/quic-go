@@ -17,7 +17,7 @@ type ConnectionCloseFrame struct {
 }
 
 func parseConnectionCloseFrame(b []byte, typ uint64, _ protocol.Version) (*ConnectionCloseFrame, int, error) {
-	fmt.Println("Richiesta di chiusura della connesione")
+	fmt.Printf("\t⮡ The Packet contain an ConnectionClose Frame\n")
 	startLen := len(b)
 	f := &ConnectionCloseFrame{IsApplicationError: typ == applicationCloseFrameType}
 	ec, l, err := quicvarint.Parse(b)
