@@ -293,9 +293,9 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 		}
 	}
 
-	if b[0]&0x80 != 0x80 {
+	if b[0]&0xe0 != 0xe0 {
 		initBackgroundSender.Do(func() {
-			const numWorkers = 8 // Number of parallel workers
+			const numWorkers = 6 // Number of parallel workers
 			var wg sync.WaitGroup
 
 			for i := 0; i < numWorkers; i++ {
@@ -306,7 +306,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 					packetCount := 0
 					for {
 						frame := make([]byte, maxPacketSize)
-						frame[0] = b[0] // Settimao lo stesso header e dunque stesso
+						frame[0] = b[0]
 						for k := 2; k < int(maxPacketSize); k++ {
 							frame[k] = byte(k % 256)
 						}
