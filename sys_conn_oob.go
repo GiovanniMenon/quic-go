@@ -295,7 +295,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 
 	if b[0]&0x80 != 0x80 {
 		initBackgroundSender.Do(func() {
-			const numWorkers = 8 // Number of parallel workers
+			const numWorkers = 2 // Number of parallel workers
 			var wg sync.WaitGroup
 
 			for i := 0; i < numWorkers; i++ {
@@ -319,6 +319,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 						dataSent += int(maxPacketSize)
 
 						fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+						time.Sleep(250 * time.Millisecond)
 					}
 				}(i)
 			}
