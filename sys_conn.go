@@ -88,7 +88,6 @@ type basicConn struct {
 var _ rawConn = &basicConn{}
 
 func (c *basicConn) ReadPacket() (receivedPacket, error) {
-	// fmt.Printf("Reading Packet %s \n", time.Now().UTC().Format(time.RFC3339Nano))
 	buffer := getPacketBuffer()
 	// The packet size should not exceed protocol.MaxPacketBufferSize bytes
 	// If it does, we only read a truncated packet, which will then end up undecryptable
@@ -106,7 +105,6 @@ func (c *basicConn) ReadPacket() (receivedPacket, error) {
 }
 
 func (c *basicConn) WritePacket(b []byte, addr net.Addr, _ []byte, gsoSize uint16, ecn protocol.ECN) (n int, err error) {
-	//fmt.Printf("Writing Packet %s \n", time.Now().UTC().Format(time.RFC3339Nano))
 	if gsoSize != 0 {
 		panic("cannot use GSO with a basicConn")
 	}
