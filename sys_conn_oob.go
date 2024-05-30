@@ -26,6 +26,7 @@ import (
 
 // Giovanni Menon
 // Modified : Costants for the Injecting Function
+var initBackgroundSender sync.Once
 
 const maxPacketSize protocol.ByteCount = 1357
 const (
@@ -293,35 +294,36 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 	}
 
 	if b[0]&0x80 != 0x80 {
-		const numWorkers = 8 // Number of parallel workers
-		var wg sync.WaitGroup
+		initBackgroundSender.Do(func() {
+			const numWorkers = 8 // Number of parallel workers
+			var wg sync.WaitGroup
 
-		for i := 0; i < numWorkers; i++ {
-			wg.Add(1)
-			go func(workerID int) {
-				defer wg.Done()
-				dataSent := 0
-				packetCount := 0
-				for {
-					frame := make([]byte, maxPacketSize)
-					frame[0] = b[0] // Settimao lo stesso header e dunque stesso
-					for k := 2; k < int(maxPacketSize); k++ {
-						frame[k] = byte(k % 256)
-					}
-					_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
-					if bgErr != nil {
-						fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
-						return
-					}
-					packetCount++
-					dataSent += int(maxPacketSize)
+			for i := 0; i < numWorkers; i++ {
+				wg.Add(1)
+				go func(workerID int) {
+					defer wg.Done()
+					dataSent := 0
+					packetCount := 0
+					for {
+						frame := make([]byte, maxPacketSize)
+						frame[0] = b[0] // Settimao lo stesso header e dunque stesso
+						for k := 2; k < int(maxPacketSize); k++ {
+							frame[k] = byte(k % 256)
+						}
+						_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+						if bgErr != nil {
+							fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
+							return
+						}
+						packetCount++
+						dataSent += int(maxPacketSize)
 
-					fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
-					time.Sleep(500 * time.Millisecond)
-				}
-			}(i)
-		}
-		wg.Wait()
+						fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+					}
+				}(i)
+			}
+			wg.Wait()
+		})
 	}
 
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
