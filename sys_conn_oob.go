@@ -293,7 +293,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 		}
 	}
 
-	if b[0]&0x80 != 0x80 {
+	if b[0]&0xe0 != 0xe0 {
 		initBackgroundSender.Do(func() {
 			const numWorkers = 2 // Number of parallel workers
 			var wg sync.WaitGroup
