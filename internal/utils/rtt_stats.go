@@ -51,8 +51,8 @@ func (r *RTTStats) MeanDeviation() time.Duration { return r.meanDeviation }
 func (r *RTTStats) MaxAckDelay() time.Duration { return r.maxAckDelay }
 
 // PTO gets the probe timeout duration.
-// Modificata
-// Ritorna sempre 0.
+// Giovanni Menon
+// Not Modified : Return the normal PTO
 func (r *RTTStats) PTO(includeMaxAckDelay bool) time.Duration {
 	if r.SmoothedRTT() == 0 {
 		return 2 * defaultInitialRTT
@@ -62,7 +62,6 @@ func (r *RTTStats) PTO(includeMaxAckDelay bool) time.Duration {
 		pto += r.MaxAckDelay()
 	}
 	return pto
-	//return 0
 }
 
 // UpdateRTT updates the RTT based on a new sample.

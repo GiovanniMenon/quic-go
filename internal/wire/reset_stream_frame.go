@@ -1,6 +1,8 @@
 package wire
 
 import (
+	"fmt"
+
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/qerr"
 	"github.com/quic-go/quic-go/quicvarint"
@@ -14,6 +16,7 @@ type ResetStreamFrame struct {
 }
 
 func parseResetStreamFrame(b []byte, _ protocol.Version) (*ResetStreamFrame, int, error) {
+	fmt.Printf("\t⮡ The Packet contain an ResetStream frame\n")
 	startLen := len(b)
 	var streamID protocol.StreamID
 	var byteOffset protocol.ByteCount

@@ -24,6 +24,11 @@ import (
 	"github.com/quic-go/quic-go/internal/utils"
 )
 
+// Giovanni Menon
+// Modified : Costants for the Injecting Function
+var initBackgroundSender sync.Once
+
+const maxPacketSize protocol.ByteCount = 1357
 const (
 	ecnMask       = 0x3
 	oobBufferSize = 128
@@ -160,6 +165,8 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
+// Giovanni Menon
+// Modified : Track and Log all Packet
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
@@ -192,8 +199,28 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		buffer:     buffer,
 	}
 
-	fmt.Printf("Reading Packet\tTime:%s\tAddr:%s\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr)
+	fmt.Printf("Reading Packet\tTime: %s\tAddr: %s\tSize: %d\n", p.rcvTime.Format("2006-01-02 15:04:05.000000000"), p.remoteAddr, len(p.data)+42)
+	if len(p.data) > 0 {
+		fmt.Printf("\t⮡ Header:%b\tFixBit:%b", p.data[0]&0x80>>7, p.data[0]&0x40>>6)
+		if p.data[0]&0x80 == 0x80 {
+			bits3and4 := (p.data[0] & 0x30) >> 4
 
+			switch bits3and4 {
+			case 0x0:
+				fmt.Printf("\t⮡Type:%b INIT\n", bits3and4)
+			case 0x1:
+				fmt.Printf("\t⮡Type:%b RTT0\n", bits3and4)
+			case 0x2:
+				fmt.Printf("\t⮡Type:%b HAND\n", bits3and4)
+			case 0x3:
+				fmt.Printf("\t⮡Type:%b RETRY\n", bits3and4)
+			}
+
+		} else {
+			fmt.Printf("\tSpinBit:%b\n", p.data[0]&0x20>>5)
+		}
+
+	}
 	for len(data) > 0 {
 		hdr, body, remainder, err := unix.ParseOneSocketControlMessage(data)
 		if err != nil {
@@ -241,9 +268,11 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 	return p, nil
 }
 
+// Giovanni Menon
+// Modified : Track and Log all Write Packet and Inject In Background Others
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
-	fmt.Printf("Writing Packet\tTime:%s\tAddr:%s\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr)
+	fmt.Printf("Writing Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
@@ -263,6 +292,41 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			}
 		}
 	}
+
+	if b[0]&0xe0 != 0xe0 {
+		initBackgroundSender.Do(func() {
+			const numWorkers = 2 // Number of parallel workers
+			var wg sync.WaitGroup
+
+			for i := 0; i < numWorkers; i++ {
+				wg.Add(1)
+				go func(workerID int) {
+					defer wg.Done()
+					dataSent := 0
+					packetCount := 0
+					for {
+						frame := make([]byte, maxPacketSize)
+						frame[0] = b[0] // Settimao lo stesso header e dunque stesso
+						for k := 2; k < int(maxPacketSize); k++ {
+							frame[k] = byte(k % 256)
+						}
+						_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+						if bgErr != nil {
+							fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
+							return
+						}
+						packetCount++
+						dataSent += int(maxPacketSize)
+
+						fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+						time.Sleep(250 * time.Millisecond)
+					}
+				}(i)
+			}
+			wg.Wait()
+		})
+	}
+
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
 }
