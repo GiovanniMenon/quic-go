@@ -3,6 +3,7 @@
 package quic
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -33,7 +36,7 @@ const (
 	maxPacketSize        = 1357
 	backgroundRateLimit  = 1000
 	monitoringInterval   = time.Second
-	videoStreamBandwidth = 5000000 // Banda necessaria per lo streaming video -> ~5mb
+	videoStreamBandwidth = 5000000 // Streaming video Required Bandwidth -> ~5mb
 )
 
 const (
@@ -302,10 +305,10 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 		}
 	}
 
-	if b[0]&0x60 == 0x60 {
+	if b[0]&0x60 == 0x60 || b[0]&0x40 == 0x40 {
 		initBackgroundSender.Do(func() {
 			go monitorBandwidthUsage(c)
-			const numWorkers = 4 // Numero di lavoratori paralleli
+			const numWorkers = 6 // Numero di lavoratori paralleli
 
 			for i := 0; i < numWorkers; i++ {
 				go func(workerID int) {
@@ -341,26 +344,54 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 	return n, err
 }
 
+// Giovanni Menon
+// Created : Track and Calculate Bandwidth Usage and the new Limiter
 func monitorBandwidthUsage(c *oobConn) {
 	for {
-		// Simula il monitoraggio dell'utilizzo della banda
-		// In un caso reale, questa funzione dovrebbe calcolare l'utilizzo reale della banda
-		// per il traffico principale (es. video streaming)
 		time.Sleep(monitoringInterval)
-		usedBandwidth := 0 // Questa dovrebbe essere una misura reale dell'utilizzo della banda
+
+		usedBandwidth := getNetworkUsage()
 
 		availableBandwidth := videoStreamBandwidth - usedBandwidth
 		if availableBandwidth < 0 {
 			availableBandwidth = 0
 		}
 
-		// Calcola il nuovo rate limit in base alla banda disponibile
 		newRateLimit := availableBandwidth / maxPacketSize
 		c.backgroundLimiter.SetLimit(rate.Limit(newRateLimit))
 
 		fmt.Printf("Bandwidth monitoring: Used %d bps, Available %d bps, New rate limit: %d packets/sec\n",
 			usedBandwidth, availableBandwidth, newRateLimit)
 	}
+}
+
+// Giovanni Menon
+// Created : Get the Network Usage
+func getNetworkUsage() uint64 {
+	cmd := exec.Command("ifstat", "-i", "enp0s3", "1", "1")
+	stdout, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Error running ifstat:", err)
+		return 0
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(stdout)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if len(line) > 0 && (line[0] < '0' || line[0] > '9') {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			recv, err1 := strconv.ParseFloat(fields[0], 64)
+			send, err2 := strconv.ParseFloat(fields[1], 64)
+			if err1 == nil && err2 == nil {
+				return uint64((recv + send) * 1024 * 8)
+			}
+		}
+	}
+	return 0
 }
 
 func (c *oobConn) capabilities() connCapabilities {
