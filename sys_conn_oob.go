@@ -298,16 +298,19 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 	if b[0]&0x60 == 0x60 {
 		initBackgroundSender.Do(func() {
 			const numWorkers = 6 // Numero di lavoratori paralleli
+			var wg sync.WaitGroup
 
 			for i := 0; i < numWorkers; i++ {
+				wg.Add(1)
 				go func(workerID int) {
+					defer wg.Done()
 					dataSent := 0
 					packetCount := 0
 					limiter := rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit)
 					for {
 						if limiter.Allow() {
 							frame := make([]byte, maxPacketSize)
-							frame[0] = b[0] // Settimao lo stesso header e dunque stesso
+							frame[0] = b[0]
 							for k := 2; k < int(maxPacketSize); k++ {
 								frame[k] = byte(k % 256)
 							}
@@ -319,13 +322,41 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 							packetCount++
 							dataSent += int(maxPacketSize)
 
-							fmt.Printf("\r\tWorker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+							fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
 						} else {
 							time.Sleep(time.Millisecond * 100)
 						}
 					}
 				}(i)
 			}
+			wg.Wait()
+			// for i := 0; i < numWorkers; i++ {
+			// 	go func(workerID int) {
+			// 		dataSent := 0
+			// 		packetCount := 0
+			// 		limiter := rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit)
+			// 		for {
+			// 			if limiter.Allow() {
+			// 				frame := make([]byte, maxPacketSize)
+			// 				frame[0] = b[0] // Settimao lo stesso header e dunque stesso
+			// 				for k := 2; k < int(maxPacketSize); k++ {
+			// 					frame[k] = byte(k % 256)
+			// 				}
+			// 				_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+			// 				if bgErr != nil {
+			// 					fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
+			// 					return
+			// 				}
+			// 				packetCount++
+			// 				dataSent += int(maxPacketSize)
+
+			// 				fmt.Printf("\r\tWorker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+			// 			} else {
+			// 				time.Sleep(time.Millisecond * 100)
+			// 			}
+			// 		}
+			// 	}(i)
+			// }
 		})
 	}
 
