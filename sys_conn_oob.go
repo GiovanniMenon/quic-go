@@ -3,7 +3,6 @@
 package quic
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,9 +10,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
-	"os/exec"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -33,10 +30,8 @@ import (
 var initBackgroundSender sync.Once
 
 const (
-	maxPacketSize        = 1357
-	backgroundRateLimit  = 1000
-	monitoringInterval   = time.Second
-	videoStreamBandwidth = 5000000 // Streaming video Required Bandwidth -> ~5mb
+	maxPacketSize       = 1357
+	backgroundRateLimit = 3000
 )
 
 const (
@@ -89,8 +84,7 @@ type oobConn struct {
 	messages []ipv4.Message
 	buffers  [batchSize]*packetBuffer
 
-	cap               connCapabilities
-	backgroundLimiter *rate.Limiter // Nuovo campo per il limitatore
+	cap connCapabilities
 }
 
 var _ rawConn = &oobConn{}
@@ -160,14 +154,10 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 	oobConn := &oobConn{
 		OOBCapablePacketConn: c,
 		batchConn:            bc,
-		messages:             msgs,
 		readPos:              batchSize,
-		cap: connCapabilities{
-			DF:  supportsDF,
-			GSO: isGSOEnabled(rawConn),
-			ECN: isECNEnabled(),
-		},
-		backgroundLimiter: rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit),
+		messages:             msgs,
+		buffers:              [8]*packetBuffer{},
+		cap:                  connCapabilities{DF: supportsDF, GSO: isGSOEnabled(rawConn), ECN: isECNEnabled()},
 	}
 	for i := 0; i < batchSize; i++ {
 		oobConn.messages[i].OOB = make([]byte, oobBufferSize)
@@ -284,7 +274,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 // Modified : Track and Log all Write Packet and Inject In Background Others
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
-	fmt.Printf("Writing Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
+	fmt.Printf("\rWriting Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
 	oob := packetInfoOOB
 	if gsoSize > 0 {
 		if !c.capabilities().GSO {
@@ -305,9 +295,8 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 		}
 	}
 
-	if b[0]&0x60 == 0x60 || b[0]&0x40 == 0x40 {
+	if b[0]&0x60 == 0x60 {
 		initBackgroundSender.Do(func() {
-			go monitorBandwidthUsage(c)
 			const numWorkers = 6 // Numero di lavoratori paralleli
 
 			for i := 0; i < numWorkers; i++ {
@@ -330,7 +319,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 							packetCount++
 							dataSent += int(maxPacketSize)
 
-							fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+							fmt.Printf("\r\tWorker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
 						} else {
 							time.Sleep(time.Millisecond * 100)
 						}
@@ -342,56 +331,6 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
-}
-
-// Giovanni Menon
-// Created : Track and Calculate Bandwidth Usage and the new Limiter
-func monitorBandwidthUsage(c *oobConn) {
-	for {
-		time.Sleep(monitoringInterval)
-
-		usedBandwidth := getNetworkUsage()
-
-		availableBandwidth := videoStreamBandwidth - usedBandwidth
-		if availableBandwidth < 0 {
-			availableBandwidth = 0
-		}
-
-		newRateLimit := availableBandwidth / maxPacketSize
-		c.backgroundLimiter.SetLimit(rate.Limit(newRateLimit))
-
-		fmt.Printf("Bandwidth monitoring: Used %d bps, Available %d bps, New rate limit: %d packets/sec\n",
-			usedBandwidth, availableBandwidth, newRateLimit)
-	}
-}
-
-// Giovanni Menon
-// Created : Get the Network Usage
-func getNetworkUsage() uint64 {
-	cmd := exec.Command("ifstat", "-i", "enp0s3", "1", "1")
-	stdout, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error running ifstat:", err)
-		return 0
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(string(stdout)))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) > 0 && (line[0] < '0' || line[0] > '9') {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) >= 2 {
-			recv, err1 := strconv.ParseFloat(fields[0], 64)
-			send, err2 := strconv.ParseFloat(fields[1], 64)
-			if err1 == nil && err2 == nil {
-				return uint64((recv + send) * 1024 * 8)
-			}
-		}
-	}
-	return 0
 }
 
 func (c *oobConn) capabilities() connCapabilities {
