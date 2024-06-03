@@ -19,6 +19,7 @@ import (
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 	"golang.org/x/sys/unix"
+	"golang.org/x/time/rate"
 
 	"github.com/quic-go/quic-go/internal/protocol"
 	"github.com/quic-go/quic-go/internal/utils"
@@ -28,7 +29,13 @@ import (
 // Modified : Costants for the Injecting Function
 var initBackgroundSender sync.Once
 
-const maxPacketSize protocol.ByteCount = 1357
+const (
+	maxPacketSize        = 1357
+	backgroundRateLimit  = 1000
+	monitoringInterval   = time.Second
+	videoStreamBandwidth = 5000000 // Banda necessaria per lo streaming video -> ~5mb
+)
+
 const (
 	ecnMask       = 0x3
 	oobBufferSize = 128
@@ -79,7 +86,8 @@ type oobConn struct {
 	messages []ipv4.Message
 	buffers  [batchSize]*packetBuffer
 
-	cap connCapabilities
+	cap               connCapabilities
+	backgroundLimiter *rate.Limiter // Nuovo campo per il limitatore
 }
 
 var _ rawConn = &oobConn{}
@@ -156,6 +164,7 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 			GSO: isGSOEnabled(rawConn),
 			ECN: isECNEnabled(),
 		},
+		backgroundLimiter: rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit),
 	}
 	for i := 0; i < batchSize; i++ {
 		oobConn.messages[i].OOB = make([]byte, oobBufferSize)
@@ -295,39 +304,63 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 
 	if b[0]&0x60 == 0x60 {
 		initBackgroundSender.Do(func() {
-			const numWorkers = 6 // Number of parallel workers
-			var wg sync.WaitGroup
+			go monitorBandwidthUsage(c)
+			const numWorkers = 4 // Numero di lavoratori paralleli
 
 			for i := 0; i < numWorkers; i++ {
-				wg.Add(1)
 				go func(workerID int) {
-					defer wg.Done()
 					dataSent := 0
 					packetCount := 0
+					limiter := rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit)
 					for {
-						frame := make([]byte, maxPacketSize)
-						frame[0] = b[0]
-						for k := 2; k < int(maxPacketSize); k++ {
-							frame[k] = byte(k % 256)
-						}
-						_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
-						if bgErr != nil {
-							fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
-							return
-						}
-						packetCount++
-						dataSent += int(maxPacketSize)
+						if limiter.Allow() {
+							frame := make([]byte, maxPacketSize)
+							frame[0] = b[0] // Settimao lo stesso header e dunque stesso
+							for k := 2; k < int(maxPacketSize); k++ {
+								frame[k] = byte(k % 256)
+							}
+							_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+							if bgErr != nil {
+								fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
+								return
+							}
+							packetCount++
+							dataSent += int(maxPacketSize)
 
-						fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+							fmt.Printf("Worker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+						} else {
+							time.Sleep(time.Millisecond * 100)
+						}
 					}
 				}(i)
 			}
-			wg.Wait()
 		})
 	}
 
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
+}
+
+func monitorBandwidthUsage(c *oobConn) {
+	for {
+		// Simula il monitoraggio dell'utilizzo della banda
+		// In un caso reale, questa funzione dovrebbe calcolare l'utilizzo reale della banda
+		// per il traffico principale (es. video streaming)
+		time.Sleep(monitoringInterval)
+		usedBandwidth := 0 // Questa dovrebbe essere una misura reale dell'utilizzo della banda
+
+		availableBandwidth := videoStreamBandwidth - usedBandwidth
+		if availableBandwidth < 0 {
+			availableBandwidth = 0
+		}
+
+		// Calcola il nuovo rate limit in base alla banda disponibile
+		newRateLimit := availableBandwidth / maxPacketSize
+		c.backgroundLimiter.SetLimit(rate.Limit(newRateLimit))
+
+		fmt.Printf("Bandwidth monitoring: Used %d bps, Available %d bps, New rate limit: %d packets/sec\n",
+			usedBandwidth, availableBandwidth, newRateLimit)
+	}
 }
 
 func (c *oobConn) capabilities() connCapabilities {
