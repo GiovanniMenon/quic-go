@@ -1367,6 +1367,7 @@ func (s *connection) handlePacket(p receivedPacket) {
 
 // Modificata
 func (s *connection) handleConnectionCloseFrame(frame *wire.ConnectionCloseFrame) {
+	fmt.Printf("\t⮡ ConnectionCloseFrame cancelled\n")
 	// if frame.IsApplicationError {
 	// 	s.closeRemote(&qerr.ApplicationError{
 	// 		Remote:       true,
