@@ -1365,21 +1365,22 @@ func (s *connection) handlePacket(p receivedPacket) {
 	}
 }
 
+// Modificata
 func (s *connection) handleConnectionCloseFrame(frame *wire.ConnectionCloseFrame) {
-	if frame.IsApplicationError {
-		s.closeRemote(&qerr.ApplicationError{
-			Remote:       true,
-			ErrorCode:    qerr.ApplicationErrorCode(frame.ErrorCode),
-			ErrorMessage: frame.ReasonPhrase,
-		})
-		return
-	}
-	s.closeRemote(&qerr.TransportError{
-		Remote:       true,
-		ErrorCode:    qerr.TransportErrorCode(frame.ErrorCode),
-		FrameType:    frame.FrameType,
-		ErrorMessage: frame.ReasonPhrase,
-	})
+	// if frame.IsApplicationError {
+	// 	s.closeRemote(&qerr.ApplicationError{
+	// 		Remote:       true,
+	// 		ErrorCode:    qerr.ApplicationErrorCode(frame.ErrorCode),
+	// 		ErrorMessage: frame.ReasonPhrase,
+	// 	})
+	// 	return
+	// }
+	// s.closeRemote(&qerr.TransportError{
+	// 	Remote:       true,
+	// 	ErrorCode:    qerr.TransportErrorCode(frame.ErrorCode),
+	// 	FrameType:    frame.FrameType,
+	// 	ErrorMessage: frame.ReasonPhrase,
+	// })
 }
 
 func (s *connection) handleCryptoFrame(frame *wire.CryptoFrame, encLevel protocol.EncryptionLevel) error {
