@@ -31,7 +31,7 @@ var initBackgroundSender sync.Once
 
 const (
 	maxPacketSize       = 1357
-	backgroundRateLimit = 2500
+	backgroundRateLimit = 1000
 )
 
 const (
