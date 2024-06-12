@@ -1365,7 +1365,8 @@ func (s *connection) handlePacket(p receivedPacket) {
 	}
 }
 
-// Modificata
+// Giovanni Menon
+// Modified : Ignore and Cancel the Connection Close Frame
 func (s *connection) handleConnectionCloseFrame(frame *wire.ConnectionCloseFrame) {
 	fmt.Printf("\t⮡ ConnectionCloseFrame cancelled\n")
 	// if frame.IsApplicationError {
