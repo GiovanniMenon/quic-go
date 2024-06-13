@@ -26,8 +26,11 @@ import (
 )
 
 // Giovanni Menon
-// Modified : Costants for the Injecting Function
-var initBackgroundSender sync.Once
+// Modified : Costants and Variables for the Injecting Function
+var (
+	initBackgroundSender sync.Once
+	startSending         = false
+)
 
 const (
 	maxPacketSize       = 1357
@@ -220,6 +223,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 		} else {
 			fmt.Printf("\tSpinBit:%b\n", p.data[0]&0x20>>5)
+			startSending = true
 		}
 
 	}
@@ -295,7 +299,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 		}
 	}
 
-	if b[0]&0x60 == 0x60 {
+	if startSending == true {
 		initBackgroundSender.Do(func() {
 			const numWorkers = 6 // Numero di lavoratori paralleli
 
