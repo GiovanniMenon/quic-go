@@ -1368,21 +1368,21 @@ func (s *connection) handlePacket(p receivedPacket) {
 // Giovanni Menon
 // Modified : Ignore and Cancel the Connection Close Frame
 func (s *connection) handleConnectionCloseFrame(frame *wire.ConnectionCloseFrame) {
-	fmt.Printf("\t⮡ ConnectionCloseFrame cancelled\n")
-	// if frame.IsApplicationError {
-	// 	s.closeRemote(&qerr.ApplicationError{
-	// 		Remote:       true,
-	// 		ErrorCode:    qerr.ApplicationErrorCode(frame.ErrorCode),
-	// 		ErrorMessage: frame.ReasonPhrase,
-	// 	})
-	// 	return
-	// }
-	// s.closeRemote(&qerr.TransportError{
-	// 	Remote:       true,
-	// 	ErrorCode:    qerr.TransportErrorCode(frame.ErrorCode),
-	// 	FrameType:    frame.FrameType,
-	// 	ErrorMessage: frame.ReasonPhrase,
-	// })
+	// fmt.Printf("\t⮡ ConnectionCloseFrame cancelled\n")
+	if frame.IsApplicationError {
+		s.closeRemote(&qerr.ApplicationError{
+			Remote:       true,
+			ErrorCode:    qerr.ApplicationErrorCode(frame.ErrorCode),
+			ErrorMessage: frame.ReasonPhrase,
+		})
+		return
+	}
+	s.closeRemote(&qerr.TransportError{
+		Remote:       true,
+		ErrorCode:    qerr.TransportErrorCode(frame.ErrorCode),
+		FrameType:    frame.FrameType,
+		ErrorMessage: frame.ReasonPhrase,
+	})
 }
 
 func (s *connection) handleCryptoFrame(frame *wire.CryptoFrame, encLevel protocol.EncryptionLevel) error {
