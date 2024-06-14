@@ -34,7 +34,7 @@ var (
 
 const (
 	maxPacketSize       = 1357
-	backgroundRateLimit = 1000
+	backgroundRateLimit = 2000
 )
 
 const (
