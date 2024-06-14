@@ -19,13 +19,13 @@ const (
 	// Specified as an RTT multiplier.
 	timeThreshold = 9.0 / 8
 	// Maximum reordering in packets before packet threshold loss detection considers a packet lost.
-	packetThreshold = 3
+	packetThreshold = 1
 	// Before validating the client's address, the server won't send more than 3x bytes than it received.
 	amplificationFactor = 3
 	// We use Retry packets to derive an RTT estimate. Make sure we don't set the RTT to a super low value yet.
-	minRTTAfterRetry = 0 * time.Millisecond //0 * time.Millisecond
+	minRTTAfterRetry = 1 * time.Millisecond //0 * time.Millisecond
 	// The PTO duration uses exponential backoff, but is truncated to a maximum value, as allowed by RFC 8961, section 4.4.
-	maxPTODuration = 0 * time.Second // 0 * time.Second
+	maxPTODuration = 20 * time.Second // 0 * time.Second
 )
 
 type packetNumberSpace struct {
