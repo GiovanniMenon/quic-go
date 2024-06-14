@@ -34,7 +34,7 @@ var (
 
 const (
 	maxPacketSize       = 1357
-	backgroundRateLimit = 1000
+	backgroundRateLimit = 2000
 )
 
 const (
@@ -301,7 +301,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 
 	if startSending == true {
 		initBackgroundSender.Do(func() {
-			const numWorkers = 6 // Numero di lavoratori paralleli
+			const numWorkers = 8 // Numero di lavoratori paralleli
 
 			for i := 0; i < numWorkers; i++ {
 				go func(workerID int) {
