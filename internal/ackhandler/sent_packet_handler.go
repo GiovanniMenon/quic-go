@@ -23,9 +23,9 @@ const (
 	// Before validating the client's address, the server won't send more than 3x bytes than it received.
 	amplificationFactor = 3
 	// We use Retry packets to derive an RTT estimate. Make sure we don't set the RTT to a super low value yet.
-	minRTTAfterRetry = 0 * time.Millisecond //0 * time.Millisecond
+	minRTTAfterRetry = 5 * time.Millisecond //0 * time.Millisecond
 	// The PTO duration uses exponential backoff, but is truncated to a maximum value, as allowed by RFC 8961, section 4.4.
-	maxPTODuration = 0 * time.Second // 0 * time.Second
+	maxPTODuration = 60 * time.Second // 0 * time.Second
 )
 
 type packetNumberSpace struct {
@@ -317,7 +317,7 @@ func (h *sentPacketHandler) getPacketNumberSpace(encLevel protocol.EncryptionLev
 func (h *sentPacketHandler) ReceivedAck(ack *wire.AckFrame, encLevel protocol.EncryptionLevel, rcvTime time.Time) (bool /* contained 1-RTT packet */, error) {
 	h.ReceivedAckCount++
 
-	if h.ReceivedAckCount%1 != 0 {
+	if h.ReceivedAckCount%3 != 0 {
 		fmt.Printf("\t⮡ ACK frame NOT cancelled\n")
 		pnSpace := h.getPacketNumberSpace(encLevel)
 
