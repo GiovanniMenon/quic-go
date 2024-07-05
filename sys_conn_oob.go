@@ -34,7 +34,7 @@ const (
 	ecnMask       = 0x3
 	oobBufferSize = 128
 
-	numberAckOscured = 2
+	numberAckOscured = 5
 )
 
 // Contrary to what the naming suggests, the ipv{4,6}.Message is not dependent on the IP version.
