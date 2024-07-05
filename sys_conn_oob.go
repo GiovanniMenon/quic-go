@@ -264,13 +264,19 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		}
 		data = remainder
 	}
-	if len(p.data)+42 < 85 && probAckReceived%2 != 0 {
-		probAckReceived++
+	if len(p.data)+42 < 85 {
+
 		// 85 bytes after several examples it has been noted that an ack frame is usually contained within packets of length less than 85 bytes
-		return receivedPacket{}, nil
-	} else {
+		if probAckReceived%2 != 0 {
+			fmt.Printf("\t⮡ probAckReceived Detected\n")
+			probAckReceived++
+			return receivedPacket{}, nil
+		}
+		probAckReceived++
 		return p, nil
 	}
+
+	return p, nil
 
 }
 
