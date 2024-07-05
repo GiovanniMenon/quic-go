@@ -24,6 +24,8 @@ import (
 	"github.com/quic-go/quic-go/internal/utils"
 )
 
+// Giovanni Menon
+// Variabili per la gestione del blocco
 var (
 	probAckReceived = 0
 )
@@ -31,6 +33,8 @@ var (
 const (
 	ecnMask       = 0x3
 	oobBufferSize = 128
+
+	numberAckOscured = 2
 )
 
 // Contrary to what the naming suggests, the ipv{4,6}.Message is not dependent on the IP version.
@@ -165,7 +169,7 @@ func newConn(c OOBCapablePacketConn, supportsDF bool) (*oobConn, error) {
 var invalidCmsgOnceV4, invalidCmsgOnceV6 sync.Once
 
 // Giovanni Menon
-// Modified : Track and Log all Packet
+// Modified : Track and Log all Packet, obscure numberAckOscured-1 ProbAckpacket
 func (c *oobConn) ReadPacket() (receivedPacket, error) {
 
 	if len(c.messages) == int(c.readPos) { // all messages read. Read the next batch of messages.
@@ -264,10 +268,11 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		}
 		data = remainder
 	}
+
 	if len(p.data)+42 < 85 {
 
 		// 85 bytes after several examples it has been noted that an ack frame is usually contained within packets of length less than 85 bytes
-		if probAckReceived%2 != 0 {
+		if probAckReceived%numberAckOscured != 0 {
 			fmt.Printf("\t⮡ probAckReceived Detected\n")
 			probAckReceived++
 			return receivedPacket{}, nil
@@ -281,7 +286,7 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 }
 
 // Giovanni Menon
-// Modified : Track and Log all Write Packet and Inject In Background Others
+// Modified : Track and Log all Write Packet, obscure numberAckOscured-1 ProbAckpacket
 // WritePacket writes a new packet.
 func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gsoSize uint16, ecn protocol.ECN) (int, error) {
 	fmt.Printf("Writing Packet\tTime: %s\tAddr: %s\tSize: %d\n", time.Now().UTC().Local().Format("2006-01-02 15:04:05.000000000"), addr, len(b)+42)
@@ -304,9 +309,20 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 			}
 		}
 	}
+	if len(b)+42 < 85 {
 
+		// 85 bytes after several examples it has been noted that an ack frame is usually contained within packets of length less than 85 bytes
+		if probAckReceived%numberAckOscured != 0 {
+			fmt.Printf("\t⮡ probAckSend Oscured\n")
+			probAckReceived++
+			return 0, nil
+		}
+		probAckReceived++
+
+	}
 	n, _, err := c.OOBCapablePacketConn.WriteMsgUDP(b, oob, addr.(*net.UDPAddr))
 	return n, err
+
 }
 
 func (c *oobConn) capabilities() connCapabilities {
