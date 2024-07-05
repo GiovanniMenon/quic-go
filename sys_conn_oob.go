@@ -24,6 +24,10 @@ import (
 	"github.com/quic-go/quic-go/internal/utils"
 )
 
+var (
+	probAckReceived = 0
+)
+
 const (
 	ecnMask       = 0x3
 	oobBufferSize = 128
@@ -260,7 +264,8 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		}
 		data = remainder
 	}
-	if len(p.data)+42 < 85 {
+	if len(p.data)+42 < 85 && probAckReceived%2 != 0 {
+		probAckReceived++
 		// 85 bytes after several examples it has been noted that an ack frame is usually contained within packets of length less than 85 bytes
 		return receivedPacket{}, nil
 	} else {
