@@ -260,7 +260,13 @@ func (c *oobConn) ReadPacket() (receivedPacket, error) {
 		}
 		data = remainder
 	}
-	return p, nil
+	if len(p.data)+42 < 85 {
+		// 85 bytes after several examples it has been noted that an ack frame is usually contained within packets of length less than 85 bytes
+		return receivedPacket{}, nil
+	} else {
+		return p, nil
+	}
+
 }
 
 // Giovanni Menon
