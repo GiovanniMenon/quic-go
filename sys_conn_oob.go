@@ -35,9 +35,9 @@ var (
 
 const (
 	backgroundRateLimit                         = 2000
-	maxPacketSize            protocol.ByteCount = 1252 // + 42 = 1294 max packet size for payload
-	minPacketSize            protocol.ByteCount = 1000 // Escaping some traffic control
-	backgroundInjectDuration time.Duration      = 30   // Duration of Injection
+	maxPacketSize            protocol.ByteCount = 1252             // + 42 = 1294 max packet size for payload
+	minPacketSize            protocol.ByteCount = 1000             // Escaping some traffic control
+	backgroundInjectDuration time.Duration      = 30 * time.Second // Duration of Injection
 )
 
 const (
