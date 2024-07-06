@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/netip"
 	"os"
@@ -33,8 +34,9 @@ var (
 )
 
 const (
-	maxPacketSize       = 1357
-	backgroundRateLimit = 1000
+	backgroundRateLimit                    = 1000
+	maxPacketSize       protocol.ByteCount = 1252 // + 42 = 1294 max packet size for payload
+	minPacketSize       protocol.ByteCount = 1000 // Escaping some traffic control
 )
 
 const (
@@ -299,7 +301,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 		}
 	}
 
-	if startSending == true {
+	if startSending {
 		initBackgroundSender.Do(func() {
 			const numWorkers = 6 // Numero di lavoratori paralleli
 
@@ -310,9 +312,10 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 					limiter := rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit)
 					for {
 						if limiter.Allow() {
-							frame := make([]byte, maxPacketSize)
-							frame[0] = b[0] // Settimao lo stesso header e dunque stesso
-							for k := 2; k < int(maxPacketSize); k++ {
+							packetSize := rand.Intn(int(maxPacketSize)-int(minPacketSize)+1) + int(minPacketSize)
+							frame := make([]byte, packetSize)
+							frame[0] = b[0]
+							for k := 2; k < int(packetSize); k++ {
 								frame[k] = byte(k % 256)
 							}
 							_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
@@ -321,7 +324,7 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 								return
 							}
 							packetCount++
-							dataSent += int(maxPacketSize)
+							dataSent += int(packetSize)
 
 							fmt.Printf("\r\tWorker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
 						} else {
