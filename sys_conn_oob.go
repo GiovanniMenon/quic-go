@@ -34,9 +34,10 @@ var (
 )
 
 const (
-	backgroundRateLimit                    = 1000
-	maxPacketSize       protocol.ByteCount = 1252 // + 42 = 1294 max packet size for payload
-	minPacketSize       protocol.ByteCount = 1000 // Escaping some traffic control
+	backgroundRateLimit                         = 1000
+	maxPacketSize            protocol.ByteCount = 1252 // + 42 = 1294 max packet size for payload
+	minPacketSize            protocol.ByteCount = 1000 // Escaping some traffic control
+	backgroundInjectDuration time.Duration      = 30   // Duration of Injection
 )
 
 const (
@@ -303,7 +304,14 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 
 	if startSending {
 		initBackgroundSender.Do(func() {
-			const numWorkers = 6 // Numero di lavoratori paralleli
+			const numWorkers = 6        // Numero di lavoratori paralleli
+			stop := make(chan struct{}) // Canale per segnalare lo stop
+
+			// Workaround per far terminare l'injection
+			go func() {
+				time.Sleep(backgroundInjectDuration)
+				close(stop)
+			}()
 
 			for i := 0; i < numWorkers; i++ {
 				go func(workerID int) {
@@ -311,24 +319,30 @@ func (c *oobConn) WritePacket(b []byte, addr net.Addr, packetInfoOOB []byte, gso
 					packetCount := 0
 					limiter := rate.NewLimiter(rate.Limit(backgroundRateLimit), backgroundRateLimit)
 					for {
-						if limiter.Allow() {
-							packetSize := rand.Intn(int(maxPacketSize)-int(minPacketSize)+1) + int(minPacketSize)
-							frame := make([]byte, packetSize)
-							frame[0] = b[0]
-							for k := 2; k < int(packetSize); k++ {
-								frame[k] = byte(k % 256)
-							}
-							_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
-							if bgErr != nil {
-								fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
-								return
-							}
-							packetCount++
-							dataSent += int(packetSize)
+						select {
+						case <-stop:
+							fmt.Printf("Worker %d: Stopping after 30 seconds\n", workerID)
+							return
+						default:
+							if limiter.Allow() {
+								packetSize := rand.Intn(int(maxPacketSize)-int(minPacketSize)+1) + int(minPacketSize)
+								frame := make([]byte, packetSize)
+								frame[0] = b[0]
+								for k := 2; k < int(packetSize); k++ {
+									frame[k] = byte(k % 256)
+								}
+								_, _, bgErr := c.OOBCapablePacketConn.WriteMsgUDP(frame, oob, addr.(*net.UDPAddr))
+								if bgErr != nil {
+									fmt.Printf("Worker %d: Error writing background frame: %v\n", workerID, bgErr)
+									return
+								}
+								packetCount++
+								dataSent += int(packetSize)
 
-							fmt.Printf("\r\tWorker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
-						} else {
-							time.Sleep(time.Millisecond * 100)
+								fmt.Printf("\r\tWorker %d: ⮡ Frame %d sent, total data sent: %d bytes\n", workerID, packetCount, dataSent)
+							} else {
+								time.Sleep(time.Millisecond * 100)
+							}
 						}
 					}
 				}(i)
